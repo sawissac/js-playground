@@ -11,26 +11,25 @@ import {
   IconEdit,
   IconEyeMinus,
   IconEyePlus,
+  IconFunction,
   IconTrash,
   IconX,
 } from "@tabler/icons-react";
 import {
-  addVariable,
-  removeVariable,
-  updateDataType,
-  updateVariable,
+  addFunctionName,
+  removeFunctionName,
+  updateFunctionName,
 } from "@/state/slices/editorSlice";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircleIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listenToKeys } from "@/lib/keyListener-utils";
 
-const DataTypeContainer = () => {
+const FunctionsContainer = () => {
   const dispatch = useAppDispatch();
-  const variables = useAppSelector((state) => state.editor.variables);
-  const dataTypes = useAppSelector((state) => state.editor.dataTypes);
-  const [oldVariable, setOldVariable] = useState("");
-  const [newVariable, setNewVariable] = useState("");
+  const functions = useAppSelector((state) => state.editor.functions);
+  const [oldFunctionName, setOldFunctionName] = useState("");
+  const [newFunctionName, setNewFunctionName] = useState("");
   const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
@@ -51,7 +50,7 @@ const DataTypeContainer = () => {
     }, inputRef.current);
 
     const stopListening = listenToKeys((e: KeyboardEvent) => {
-      if (e.key === "1" && e.altKey && inputRef.current) {
+      if (e.key === "3" && e.altKey && inputRef.current) {
         e.preventDefault();
         inputRef.current?.focus();
       }
@@ -63,113 +62,77 @@ const DataTypeContainer = () => {
     };
   }, []);
 
-  const handleAddVariable = () => {
-    const variableNameLists = variables.map((variable) => variable.name);
+  const handleAddFunction = () => {
+    const functionNameLists = functions.map((fun) => fun.name);
     const temp: string[] = [];
 
-    if (newVariable.trim() === "") {
-      setError("Variable name cannot be empty");
+    if (newFunctionName.trim() === "") {
+      setError("Function name cannot be empty");
       return;
     }
 
-    if (variableNameLists.includes(newVariable.trim())) {
-      setError("Variable name already exists");
+    if (functionNameLists.includes(newFunctionName.trim())) {
+      setError("Function name already exists");
       return;
     }
 
     setError("");
 
     if (isEditing) {
-      dispatch(updateVariable({ oldVariable, newVariable }));
+      dispatch(
+        updateFunctionName({
+          oldFunctionName: oldFunctionName,
+          newFunctionName: newFunctionName,
+        })
+      );
     }
 
-    const isComma = newVariable.includes(",");
+    const isComma = newFunctionName.includes(",");
 
     if (isComma && !isEditing) {
-      const varComma = newVariable.split(",");
-      varComma.forEach((vc) => {
+      const funComma = newFunctionName.split(",");
+      funComma.forEach((vc) => {
         if (temp.includes(vc.trim())) {
-          setError("Variable name already exists");
+          setError("Function name already exists");
           return;
         }
 
-        const hasDataTypePrefix = vc.trim().includes(":");
-
-        if (hasDataTypePrefix) {
-          const variableName = vc.trim().split(":")[0];
-          const dataType = vc.trim().split(":")[1];
-
-          if (variableNameLists.includes(variableName.trim())) {
-            setError("Variable name already exists");
-            return;
-          }
-
-          if (!dataTypes.includes(dataType.trim())) {
-            setError("Data type does not exist");
-            return;
-          }
-
-          temp.push(variableName.trim());
-          dispatch(addVariable(variableName.trim()));
-          dispatch(updateDataType({ name: variableName, type: dataType }));
-        } else {
-          temp.push(vc.trim());
-          dispatch(addVariable(vc.trim()));
-        }
+        temp.push(vc.trim());
+        dispatch(addFunctionName(vc.trim()));
       });
     }
 
-    if (!isEditing && !isComma) {
-      const hasDataTypePrefix = newVariable.trim().includes(":");
-
-      if (hasDataTypePrefix) {
-        const variableName = newVariable.trim().split(":")[0];
-        const dataType = newVariable.trim().split(":")[1];
-
-        if (variableNameLists.includes(variableName.trim())) {
-          setError("Variable name already exists");
-          return;
-        }
-
-        if (!dataTypes.includes(dataType.trim())) {
-          setError("Data type does not exist");
-          return;
-        }
-
-        dispatch(addVariable(variableName.trim()));
-        dispatch(updateDataType({ name: variableName, type: dataType }));
-      } else {
-        dispatch(addVariable(newVariable.trim()));
-      }
+    if (!isComma && !isEditing) {
+      dispatch(addFunctionName(newFunctionName.trim()));
     }
 
     handleCancelUpdate();
   };
 
-  const handleRemoveVariable = (variable: string) => {
-    dispatch(removeVariable(variable));
+  const handleRemoveFunction = (variable: string) => {
+    dispatch(removeFunctionName(variable));
     handleCancelUpdate();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      handleAddVariable();
+      handleAddFunction();
     }
   };
 
   const handleOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setNewVariable(e.target.value);
+    setNewFunctionName(e.target.value);
   };
 
   const handleUpdateVariable = (variable: string) => {
-    setOldVariable(variable);
-    setNewVariable(variable);
+    setOldFunctionName(variable);
+    setNewFunctionName(variable);
     setIsEditing(true);
   };
 
   const handleCancelUpdate = () => {
-    setNewVariable("");
-    setOldVariable("");
+    setNewFunctionName("");
+    setOldFunctionName("");
     setIsEditing(false);
   };
 
@@ -184,19 +147,19 @@ const DataTypeContainer = () => {
   return (
     <div className="w-full p-2 shadow-md shadow-slate-200 rounded-md space-y-2">
       <div className="flex flex-row gap-2">
-        <Badge variant="secondary"> Variable Name</Badge>
-        <Badge variant="outline">{variables.length}</Badge>
+        <Badge variant="secondary"> Function Name</Badge>
+        <Badge variant="outline">{functions.length}</Badge>
       </div>
       <div className="flex items-center justify-between gap-2">
-        <IconBox size={16} className="shrink-0" />
+        <IconFunction size={16} className="shrink-0" />
         <Input
           ref={inputRef}
-          value={newVariable}
+          value={newFunctionName}
           onChange={handleOnChange}
           onKeyDown={handleKeyDown}
           placeholder="Variable Name"
         />
-        <Button onClick={handleAddVariable} size="icon">
+        <Button onClick={handleAddFunction} size="icon">
           <IconCircleDashedPlus size={16} />
         </Button>
         <Button ref={buttonRef} onClick={handleShowDetail} size="icon">
@@ -224,7 +187,7 @@ const DataTypeContainer = () => {
       )}
       <div className="flex flex-wrap gap-2">
         {showDetail &&
-          variables.map((variable) => (
+          functions.map((variable) => (
             <Badge
               key={variable.name}
               variant="outline"
@@ -246,7 +209,7 @@ const DataTypeContainer = () => {
               <button
                 type="button"
                 onClick={() => {
-                  handleRemoveVariable(variable.name);
+                  handleRemoveFunction(variable.name);
                 }}
                 className={cn(
                   "group-hover:block hidden",
@@ -262,4 +225,4 @@ const DataTypeContainer = () => {
   );
 };
 
-export default DataTypeContainer;
+export default FunctionsContainer;

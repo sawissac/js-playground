@@ -1,7 +1,19 @@
-// Define editor state types
+export interface Variable {
+  name: string;
+  type: string;
+  value: any;
+}
+
+export interface FunctionAction {
+  name: string;
+  dataType: string;
+  value: any;
+}
+
 export interface EditorState {
-  variables: { name: string; type: string; value: any }[];
+  variables: Variable[];
   dataTypes: string[];
+  functions: { name: string; type: string; actions: FunctionAction[] }[];
 }
 
 // Define the root state type that will be used throughout the application

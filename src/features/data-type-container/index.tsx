@@ -73,9 +73,14 @@ const DataTypeContainer = () => {
 
   return (
     <div className="w-full p-2 shadow-md shadow-slate-200 rounded-md space-y-2">
-      <Badge variant="secondary"> Data Type</Badge>
+      <div className="flex flex-row gap-2">
+        <Badge variant="secondary"> Data Type</Badge>
+        <Badge variant="outline">
+          {variables.filter((v) => v.type).length}
+        </Badge>
+      </div>
       <div className="flex items-center justify-between gap-2">
-        <IconBox size={16} />
+        <IconBox size={16} className="shrink-0"/>
         <Select
           disabled={!variables.length}
           value={selectedVariable}
@@ -94,7 +99,7 @@ const DataTypeContainer = () => {
             })}
           </SelectContent>
         </Select>
-        <IconFileTypography size={16} />
+        <IconFileTypography size={16} className="shrink-0"/>
         <Select
           disabled={!variables.length}
           value={selectedDataType}
@@ -118,7 +123,7 @@ const DataTypeContainer = () => {
           onClick={handleAddVariable}
           size="icon"
         >
-          <IconArrowMerge size={16} />
+          <IconArrowMerge size={16} className="shrink-0"/>
         </Button>
         <Button
           disabled={!variables.length || variables.every((v) => !v.type)}
