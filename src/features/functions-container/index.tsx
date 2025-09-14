@@ -24,6 +24,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircleIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listenToKeys } from "@/lib/keyListener-utils";
+import { addLog } from "@/state/slices/logSlice";
 
 const FunctionsContainer = () => {
   const dispatch = useAppDispatch();
@@ -39,8 +40,8 @@ const FunctionsContainer = () => {
   useEffect(() => {
     const inputStopListening = listenToKeys((e: KeyboardEvent) => {
       if (
-        e.altKey &&
         e.key === "e" &&
+        (e.altKey || e.metaKey || e.ctrlKey) &&
         inputRef.current &&
         inputRef.current === document.activeElement
       ) {
@@ -50,7 +51,11 @@ const FunctionsContainer = () => {
     }, inputRef.current);
 
     const stopListening = listenToKeys((e: KeyboardEvent) => {
-      if (e.key === "3" && e.altKey && inputRef.current) {
+      if (
+        e.key === "3" &&
+        (e.altKey || e.metaKey || e.ctrlKey) &&
+        inputRef.current
+      ) {
         e.preventDefault();
         inputRef.current?.focus();
       }
@@ -67,12 +72,16 @@ const FunctionsContainer = () => {
     const temp: string[] = [];
 
     if (newFunctionName.trim() === "") {
-      setError("Function name cannot be empty");
+      dispatch(
+        addLog({ type: "warning", message: "Function name cannot be empty" })
+      );
       return;
     }
 
     if (functionNameLists.includes(newFunctionName.trim())) {
-      setError("Function name already exists");
+      dispatch(
+        addLog({ type: "warning", message: "Function name already exists" })
+      );
       return;
     }
 
@@ -93,7 +102,9 @@ const FunctionsContainer = () => {
       const funComma = newFunctionName.split(",");
       funComma.forEach((vc) => {
         if (temp.includes(vc.trim())) {
-          setError("Function name already exists");
+          dispatch(
+            addLog({ type: "warning", message: "Function name already exists" })
+          );
           return;
         }
 

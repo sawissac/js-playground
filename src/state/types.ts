@@ -1,22 +1,33 @@
-export interface Variable {
+export interface VariableInterface {
   name: string;
   type: string;
   value: any;
 }
 
-export interface FunctionAction {
+export interface FunctionActionInterface {
   name: string;
   dataType: string;
   value: any;
 }
 
-export interface EditorState {
-  variables: Variable[];
-  dataTypes: string[];
-  functions: { name: string; type: string; actions: FunctionAction[] }[];
+export interface FunctionInterface {
+  name: string;
+  dataType: string;
+  actions: FunctionActionInterface[];
 }
 
-// Define the root state type that will be used throughout the application
-export interface RootState {
-  editor: EditorState;
+export interface Runner {
+  type: "set" | "call";
+  target: [string, string];
+}
+
+export interface EditorState {
+  variables: VariableInterface[];
+  dataTypes: string[];
+  functions: FunctionInterface[];
+  runner: Runner[];
+}
+
+export interface LogState {
+  logs: { type: "error" | "warning" | "info"; message: string }[];
 }

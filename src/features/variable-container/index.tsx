@@ -24,6 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircleIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listenToKeys } from "@/lib/keyListener-utils";
+import { addLog } from "@/state/slices/logSlice";
 
 const DataTypeContainer = () => {
   const dispatch = useAppDispatch();
@@ -31,7 +32,6 @@ const DataTypeContainer = () => {
   const dataTypes = useAppSelector((state) => state.editor.dataTypes);
   const [oldVariable, setOldVariable] = useState("");
   const [newVariable, setNewVariable] = useState("");
-  const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -68,16 +68,18 @@ const DataTypeContainer = () => {
     const temp: string[] = [];
 
     if (newVariable.trim() === "") {
-      setError("Variable name cannot be empty");
+      dispatch(
+        addLog({ type: "warning", message: "Variable name cannot be empty" })
+      );
       return;
     }
 
     if (variableNameLists.includes(newVariable.trim())) {
-      setError("Variable name already exists");
+      dispatch(
+        addLog({ type: "warning", message: "Variable name already exists" })
+      );
       return;
     }
-
-    setError("");
 
     if (isEditing) {
       dispatch(updateVariable({ oldVariable, newVariable }));
@@ -89,7 +91,9 @@ const DataTypeContainer = () => {
       const varComma = newVariable.split(",");
       varComma.forEach((vc) => {
         if (temp.includes(vc.trim())) {
-          setError("Variable name already exists");
+          dispatch(
+            addLog({ type: "warning", message: "Variable name already exists" })
+          );
           return;
         }
 
@@ -100,12 +104,19 @@ const DataTypeContainer = () => {
           const dataType = vc.trim().split(":")[1];
 
           if (variableNameLists.includes(variableName.trim())) {
-            setError("Variable name already exists");
+            dispatch(
+              addLog({
+                type: "warning",
+                message: "Variable name already exists",
+              })
+            );
             return;
           }
 
           if (!dataTypes.includes(dataType.trim())) {
-            setError("Data type does not exist");
+            dispatch(
+              addLog({ type: "warning", message: "Data type does not exist" })
+            );
             return;
           }
 
@@ -127,12 +138,16 @@ const DataTypeContainer = () => {
         const dataType = newVariable.trim().split(":")[1];
 
         if (variableNameLists.includes(variableName.trim())) {
-          setError("Variable name already exists");
+          dispatch(
+            addLog({ type: "warning", message: "Variable name already exists" })
+          );
           return;
         }
 
         if (!dataTypes.includes(dataType.trim())) {
-          setError("Data type does not exist");
+          dispatch(
+            addLog({ type: "warning", message: "Data type does not exist" })
+          );
           return;
         }
 
@@ -173,10 +188,6 @@ const DataTypeContainer = () => {
     setIsEditing(false);
   };
 
-  const handleClearError = () => {
-    setError("");
-  };
-
   const handleShowDetail = () => {
     setShowDetail(!showDetail);
   };
@@ -203,17 +214,7 @@ const DataTypeContainer = () => {
           {showDetail ? <IconEyeMinus size={16} /> : <IconEyePlus size={16} />}
         </Button>
       </div>
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircleIcon />
-          <AlertDescription className="flex items-center justify-between">
-            <p>Error:{error}</p>
-            <button onClick={handleClearError}>
-              <IconX size={16} />
-            </button>
-          </AlertDescription>
-        </Alert>
-      )}
+
       {isEditing && (
         <Badge variant="secondary" className="cursor-pointer">
           <p className="text-sm">UPDATE</p>

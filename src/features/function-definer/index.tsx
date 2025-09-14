@@ -11,10 +11,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StringFunctions } from "@/constants/string";
+import { useDebounce } from "@/hooks/useDebounce";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import {
   addFunctionAction,
   removeFunctionAction,
+  updateFunctionAction,
 } from "@/state/slices/editorSlice";
 import {
   IconCircleDashedPlus,
@@ -22,8 +24,9 @@ import {
   IconEyePlus,
   IconFileTypography,
   IconFunction,
+  IconTrash,
 } from "@tabler/icons-react";
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback, useRef, useEffect } from "react";
 
 const FunctionActionInput = (payload: {
   functionName: string;
@@ -34,22 +37,33 @@ const FunctionActionInput = (payload: {
   const dispatch = useAppDispatch();
   const dataTypes = useAppSelector((state) => state.editor.dataTypes);
   const functions = useAppSelector((state) => state.editor.functions);
-  const [dataType, setDataType] = React.useState("");
-  const [functionAction, setFunctionAction] = React.useState("");
+  const [value, setValue] = React.useState("");
+
+  const funcName = React.useMemo(() => {
+    return (functions.find((fn) => fn.name === payload.functionName)?.actions[
+      payload.actionIndex
+    ]?.name ?? "") as string;
+  }, [functions, payload.functionName, payload.actionIndex]);
+
+  const funcDataType = React.useMemo(() => {
+    return (functions.find((fn) => fn.name === payload.functionName)?.actions[
+      payload.actionIndex
+    ]?.dataType ?? "") as string;
+  }, [functions, payload.functionName, payload.actionIndex]);
+
+  const funcValue = React.useMemo(() => {
+    return (functions
+      .find((fn) => fn.name === payload.functionName)
+      ?.actions[payload.actionIndex]?.value?.join(",") ?? "") as string;
+  }, [functions, payload.functionName, payload.actionIndex]);
 
   const funcList = useMemo(() => {
     const createdFunctions = functions.map((fn) => [fn.name, 0]);
     let typedFunctions = null;
 
-    switch (dataType) {
+    switch (funcDataType) {
       case "string":
         typedFunctions = StringFunctions;
-        break;
-      case "array":
-        typedFunctions = [];
-        break;
-      case "boolean":
-        typedFunctions = [];
         break;
       default:
         typedFunctions = [];
@@ -58,11 +72,11 @@ const FunctionActionInput = (payload: {
     const combined = [...typedFunctions, ...createdFunctions];
 
     return combined.map((fn) => ({ name: fn[0], params: fn[1] }));
-  }, [functions, dataType]);
+  }, [functions, funcDataType]);
 
   const paramsCount = useMemo(() => {
-    return funcList.find((fn) => fn.name === functionAction)?.params ?? 0;
-  }, [funcList, functionAction]);
+    return funcList.find((fn) => fn.name === funcName)?.params ?? 0;
+  }, [funcList, funcName]);
 
   const handleRemove = () => {
     dispatch(
@@ -73,13 +87,45 @@ const FunctionActionInput = (payload: {
     );
   };
 
+  const handleDatatypeImpl = ({
+    actionName,
+    actionDataType,
+    actionValue,
+  }: {
+    actionName: string;
+    actionDataType: string;
+    actionValue: string;
+  }) => {
+    const parseValue = actionValue.split(",").map((v) => v.trim());
+    dispatch(
+      updateFunctionAction({
+        functionName: payload.functionName,
+        actionIndex: payload.actionIndex,
+        action: {
+          name: actionName,
+          dataType: actionDataType,
+          value: parseValue,
+        },
+      })
+    );
+  };
+
+  // Debounced version of handleDatatype
+  const handleDatatype = useDebounce(handleDatatypeImpl, 300);
+
   return (
     <div className="flex items-center gap-2 my-2">
       <IconFileTypography size={16} className="shrink-0" />
       <Select
         defaultValue={payload.actionDataType}
-        value={dataType}
-        onValueChange={(value) => setDataType(value)}
+        value={funcDataType}
+        onValueChange={(value) =>
+          handleDatatype({
+            actionName: funcName,
+            actionDataType: value,
+            actionValue: funcValue,
+          })
+        }
       >
         <SelectTrigger className="w-[100px]">
           <SelectValue placeholder="DT" />
@@ -95,8 +141,14 @@ const FunctionActionInput = (payload: {
       <IconFunction className="shrink-0" size={16} />
       <Select
         defaultValue={payload.actionName}
-        value={functionAction}
-        onValueChange={(value) => setFunctionAction(value)}
+        value={funcName}
+        onValueChange={(value) =>
+          handleDatatype({
+            actionName: value,
+            actionDataType: funcDataType,
+            actionValue: funcValue,
+          })
+        }
       >
         <SelectTrigger className="w-[150px]">
           <SelectValue placeholder="Fn" />
@@ -120,11 +172,26 @@ const FunctionActionInput = (payload: {
                   .map((_, i) => `arg${i + 1}`)
                   .join(", ")
           }
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+
+            handleDatatype({
+              actionName: funcName,
+              actionDataType: funcDataType,
+              actionValue: e.target.value,
+            });
+          }}
         />
       )}
 
-      <Button variant="destructive" size="icon" onClick={handleRemove}>
-        <IconCircleDashedPlus size={16} className="rotate-45" />
+      <Button
+        variant="destructive"
+        size="icon"
+        onClick={handleRemove}
+        className="ml-auto"
+      >
+        <IconTrash size={16} className="shrink-0" />
       </Button>
     </div>
   );

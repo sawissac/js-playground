@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { addLog } from "@/state/slices/logSlice";
 
 const DataTypeContainer = () => {
   const dispatch = useAppDispatch();
@@ -29,29 +30,29 @@ const DataTypeContainer = () => {
   const dataTypes = useAppSelector((state) => state.editor.dataTypes);
   const [selectedVariable, setSelectedVariable] = useState("");
   const [selectedDataType, setSelectedDataType] = useState("");
-  const [error, setError] = useState("");
   const [showDetail, setShowDetail] = useState(false);
 
   useEffect(() => {
     if (selectedVariable.trim() === "") {
       setShowDetail(false);
       setSelectedDataType("");
-      setError("");
     }
   }, [selectedVariable]);
 
   const handleAddVariable = () => {
     if (selectedVariable.trim() === "") {
-      setError("Variable name cannot be empty");
+      dispatch(
+        addLog({ type: "warning", message: "Variable name cannot be empty" })
+      );
       return;
     }
 
     if (selectedDataType.trim() === "") {
-      setError("Data type cannot be empty");
+      dispatch(
+        addLog({ type: "warning", message: "Data type cannot be empty" })
+      );
       return;
     }
-
-    setError("");
 
     dispatch(
       updateDataType({ name: selectedVariable, type: selectedDataType })
@@ -61,10 +62,6 @@ const DataTypeContainer = () => {
   const handleUpdateDataType = (variable: string) => {
     setSelectedVariable(variable);
     setSelectedDataType(variables.find((v) => v.name === variable)?.type || "");
-  };
-
-  const handleClearError = () => {
-    setError("");
   };
 
   const handleShowDetail = () => {
@@ -80,7 +77,7 @@ const DataTypeContainer = () => {
         </Badge>
       </div>
       <div className="flex items-center justify-between gap-2">
-        <IconBox size={16} className="shrink-0"/>
+        <IconBox size={16} className="shrink-0" />
         <Select
           disabled={!variables.length}
           value={selectedVariable}
@@ -99,7 +96,7 @@ const DataTypeContainer = () => {
             })}
           </SelectContent>
         </Select>
-        <IconFileTypography size={16} className="shrink-0"/>
+        <IconFileTypography size={16} className="shrink-0" />
         <Select
           disabled={!variables.length}
           value={selectedDataType}
@@ -123,7 +120,7 @@ const DataTypeContainer = () => {
           onClick={handleAddVariable}
           size="icon"
         >
-          <IconArrowMerge size={16} className="shrink-0"/>
+          <IconArrowMerge size={16} className="shrink-0" />
         </Button>
         <Button
           disabled={!variables.length || variables.every((v) => !v.type)}
@@ -133,17 +130,6 @@ const DataTypeContainer = () => {
           {showDetail ? <IconEyeMinus size={16} /> : <IconEyePlus size={16} />}
         </Button>
       </div>
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircleIcon />
-          <AlertDescription className="flex items-center justify-between">
-            <p>Error:{error}</p>
-            <button onClick={handleClearError}>
-              <IconX size={16} />
-            </button>
-          </AlertDescription>
-        </Alert>
-      )}
       <div className="flex flex-wrap gap-2">
         {showDetail &&
           variables

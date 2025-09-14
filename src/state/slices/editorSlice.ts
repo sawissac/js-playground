@@ -1,16 +1,16 @@
 "use client";
 
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { EditorState, FunctionAction } from "../types";
+import { EditorState, FunctionActionInterface, Runner } from "../types";
 
 // Define the initial state for the editor
 const initialState: EditorState = {
   variables: [],
-  dataTypes: ["string", "array", "boolean"],
+  dataTypes: ["string"],
   functions: [],
+  runner: [],
 };
 
-// Create the editor slice
 export const editorSlice = createSlice({
   name: "editor",
   initialState,
@@ -46,6 +46,20 @@ export const editorSlice = createSlice({
       );
     },
 
+    updateVariableValue: (
+      state,
+      action: PayloadAction<{
+        name: string;
+        value: string;
+      }>
+    ) => {
+      state.variables = state.variables.map((variable) =>
+        variable.name === action.payload.name
+          ? { ...variable, value: action.payload.value }
+          : variable
+      );
+    },
+
     updateDataType: (
       state,
       action: PayloadAction<{
@@ -61,7 +75,7 @@ export const editorSlice = createSlice({
     },
 
     addFunctionName: (state, action: PayloadAction<string>) => {
-      state.functions.push({ name: action.payload, type: "", actions: [] });
+      state.functions.push({ name: action.payload, dataType: "", actions: [] });
     },
 
     updateFunctionName: (
@@ -86,7 +100,10 @@ export const editorSlice = createSlice({
 
     addFunctionAction: (
       state,
-      action: PayloadAction<{ functionName: string; action: FunctionAction }>
+      action: PayloadAction<{
+        functionName: string;
+        action: FunctionActionInterface;
+      }>
     ) => {
       const func = state.functions.find(
         (f) => f.name === action.payload.functionName
@@ -101,14 +118,16 @@ export const editorSlice = createSlice({
       action: PayloadAction<{
         functionName: string;
         actionIndex: number;
-        action: FunctionAction;
+        action: FunctionActionInterface;
       }>
     ) => {
       const func = state.functions.find(
         (f) => f.name === action.payload.functionName
       );
       if (func && func.actions[action.payload.actionIndex]) {
-        func.actions[action.payload.actionIndex] = action.payload.action;
+        (func.dataType =
+          func.actions?.at(func.actions.length - 1)?.dataType ?? ""),
+          (func.actions[action.payload.actionIndex] = action.payload.action);
       }
     },
 
@@ -123,6 +142,29 @@ export const editorSlice = createSlice({
         func.actions.splice(action.payload.actionIndex, 1);
       }
     },
+
+    createSetRunner: (state) => {
+      state.runner.push({ type: "set", target: ["", ""] });
+    },
+
+    createCallRunner: (state) => {
+      state.runner.push({ type: "call", target: ["", ""] });
+    },
+
+    updateRunner: (
+      state,
+      action: PayloadAction<{ runnerIndex: number; target: [string, string] }>
+    ) => {
+      state.runner = state.runner.map((runner, index) =>
+        index === action.payload.runnerIndex
+          ? { ...runner, target: action.payload.target }
+          : runner
+      );
+    },
+
+    removeRunner: (state, action: PayloadAction<number>) => {
+      state.runner.splice(action.payload, 1);
+    },
   },
 });
 
@@ -131,6 +173,7 @@ export const {
   addVariable,
   removeVariable,
   updateVariable,
+  updateVariableValue,
   updateDataType,
   addFunctionName,
   removeFunctionName,
@@ -138,6 +181,10 @@ export const {
   addFunctionAction,
   updateFunctionAction,
   removeFunctionAction,
+  createSetRunner,
+  createCallRunner,
+  updateRunner,
+  removeRunner,
 } = editorSlice.actions;
 
 // Export the reducer
