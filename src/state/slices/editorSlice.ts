@@ -1,12 +1,14 @@
 "use client";
 
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { v4 as uuidv4 } from "uuid";
 import { EditorState, FunctionActionInterface, Runner } from "../types";
+import { DataTypes } from "@/constants/dataTypes";
 
 // Define the initial state for the editor
 const initialState: EditorState = {
   variables: [],
-  dataTypes: ["string"],
+  dataTypes: [...DataTypes],
   functions: [],
   runner: [],
 };
@@ -17,153 +19,243 @@ export const editorSlice = createSlice({
   reducers: {
     setVariables: (
       state,
-      action: PayloadAction<{ name: string; type: string; value: any }[]>
+      action: PayloadAction<
+        { id: string; name: string; type: string; value: any }[]
+      >,
     ) => {
       state.variables = action.payload;
     },
 
-    addVariable: (state, action: PayloadAction<string>) => {
-      state.variables.push({ name: action.payload, type: "", value: "" });
+    addVariable: (
+      state,
+      action: PayloadAction<{
+        id: string;
+        name: string;
+      }>,
+    ) => {
+      state.variables.push({
+        id: action.payload.id,
+        name: action.payload.name,
+        type: "string",
+        value: "",
+      });
     },
 
     removeVariable: (state, action: PayloadAction<string>) => {
       state.variables = state.variables.filter(
-        (variable) => variable.name !== action.payload
+        (variable) => variable.id !== action.payload,
       );
     },
 
     updateVariable: (
       state,
       action: PayloadAction<{
-        oldVariable: string;
-        newVariable: string;
-      }>
+        id: string;
+        newName: string;
+      }>,
     ) => {
       state.variables = state.variables.map((variable) =>
-        variable.name === action.payload.oldVariable
-          ? { ...variable, name: action.payload.newVariable }
-          : variable
+        variable.id === action.payload.id
+          ? { ...variable, name: action.payload.newName }
+          : variable,
       );
     },
 
     updateVariableValue: (
       state,
       action: PayloadAction<{
-        name: string;
-        value: string;
-      }>
+        id: string;
+        value: string | string[];
+      }>,
     ) => {
       state.variables = state.variables.map((variable) =>
-        variable.name === action.payload.name
+        variable.id === action.payload.id
           ? { ...variable, value: action.payload.value }
-          : variable
+          : variable,
       );
     },
 
     updateDataType: (
       state,
       action: PayloadAction<{
-        name: string;
+        id: string;
         type: string;
-      }>
+      }>,
     ) => {
       state.variables = state.variables.map((variable) =>
-        variable.name === action.payload.name
+        variable.id === action.payload.id
           ? { ...variable, type: action.payload.type }
-          : variable
+          : variable,
       );
     },
 
     addFunctionName: (state, action: PayloadAction<string>) => {
-      state.functions.push({ name: action.payload, dataType: "", actions: [] });
+      const tempActionId = uuidv4();
+      const useActionId = uuidv4();
+
+      state.functions.push({
+        id: uuidv4(),
+        name: action.payload,
+        dataType: "",
+        actions: [
+          {
+            id: tempActionId,
+            name: "temp",
+            dataType: "",
+            value: ["@arg1"],
+          },
+          {
+            id: useActionId,
+            name: "use",
+            dataType: "",
+            value: ["@temp1"],
+          },
+        ],
+      });
     },
 
     updateFunctionName: (
       state,
       action: PayloadAction<{
-        oldFunctionName: string;
-        newFunctionName: string;
-      }>
+        id: string;
+        newName: string;
+      }>,
     ) => {
       state.functions = state.functions.map((func) =>
-        func.name === action.payload.oldFunctionName
-          ? { ...func, name: action.payload.newFunctionName }
-          : func
+        func.id === action.payload.id
+          ? { ...func, name: action.payload.newName }
+          : func,
       );
     },
 
     removeFunctionName: (state, action: PayloadAction<string>) => {
       state.functions = state.functions.filter(
-        (func) => func.name !== action.payload
+        (func) => func.id !== action.payload,
       );
     },
 
     addFunctionAction: (
       state,
       action: PayloadAction<{
-        functionName: string;
+        functionId: string;
         action: FunctionActionInterface;
-      }>
+      }>,
     ) => {
       const func = state.functions.find(
-        (f) => f.name === action.payload.functionName
+        (f) => f.id === action.payload.functionId,
       );
       if (func) {
-        func.actions.push(action.payload.action);
+        const actionWithId = { ...action.payload.action, id: uuidv4() };
+        func.actions.push(actionWithId);
       }
     },
 
     updateFunctionAction: (
       state,
       action: PayloadAction<{
-        functionName: string;
-        actionIndex: number;
+        functionId: string;
+        actionId: string;
         action: FunctionActionInterface;
-      }>
+      }>,
     ) => {
       const func = state.functions.find(
-        (f) => f.name === action.payload.functionName
+        (f) => f.id === action.payload.functionId,
       );
-      if (func && func.actions[action.payload.actionIndex]) {
-        (func.dataType =
-          func.actions?.at(func.actions.length - 1)?.dataType ?? ""),
-          (func.actions[action.payload.actionIndex] = action.payload.action);
+      if (func) {
+        const actionIndex = func.actions.findIndex(
+          (a) => a.id === action.payload.actionId,
+        );
+        if (actionIndex !== -1) {
+          func.dataType =
+            func.actions?.at(func.actions.length - 1)?.dataType ?? "";
+          func.actions[actionIndex] = {
+            ...action.payload.action,
+            id: action.payload.actionId,
+          };
+        }
       }
     },
 
     removeFunctionAction: (
       state,
-      action: PayloadAction<{ functionName: string; actionIndex: number }>
+      action: PayloadAction<{ functionId: string; actionId: string }>,
     ) => {
       const func = state.functions.find(
-        (f) => f.name === action.payload.functionName
+        (f) => f.id === action.payload.functionId,
       );
       if (func) {
-        func.actions.splice(action.payload.actionIndex, 1);
+        func.actions = func.actions.filter(
+          (a) => a.id !== action.payload.actionId,
+        );
       }
     },
 
     createSetRunner: (state) => {
-      state.runner.push({ type: "set", target: ["", ""] });
+      state.runner.push({
+        id: uuidv4(),
+        type: "set",
+        target: ["", ""],
+        args: [],
+      });
     },
 
     createCallRunner: (state) => {
-      state.runner.push({ type: "call", target: ["", ""] });
+      state.runner.push({
+        id: uuidv4(),
+        type: "call",
+        target: ["", ""],
+        args: [],
+      });
     },
 
     updateRunner: (
       state,
-      action: PayloadAction<{ runnerIndex: number; target: [string, string] }>
+      action: PayloadAction<{ runnerId: string; runner: Runner }>,
     ) => {
-      state.runner = state.runner.map((runner, index) =>
-        index === action.payload.runnerIndex
-          ? { ...runner, target: action.payload.target }
-          : runner
+      const runnerIndex = state.runner.findIndex(
+        (r) => r.id === action.payload.runnerId,
+      );
+      if (runnerIndex !== -1) {
+        state.runner[runnerIndex] = {
+          ...action.payload.runner,
+          id: action.payload.runnerId,
+        };
+      }
+    },
+
+    removeRunner: (state, action: PayloadAction<string>) => {
+      state.runner = state.runner.filter(
+        (runner) => runner.id !== action.payload,
       );
     },
 
-    removeRunner: (state, action: PayloadAction<number>) => {
-      state.runner.splice(action.payload, 1);
+    reorderFunctionActions: (
+      state,
+      action: PayloadAction<{
+        functionId: string;
+        fromIndex: number;
+        toIndex: number;
+      }>,
+    ) => {
+      const func = state.functions.find(
+        (f) => f.id === action.payload.functionId,
+      );
+      if (func) {
+        const { fromIndex, toIndex } = action.payload;
+        const [movedAction] = func.actions.splice(fromIndex, 1);
+        func.actions.splice(toIndex, 0, movedAction);
+        func.dataType =
+          func.actions?.at(func.actions.length - 1)?.dataType ?? "";
+      }
+    },
+
+    reorderRunnerSteps: (
+      state,
+      action: PayloadAction<{ fromIndex: number; toIndex: number }>,
+    ) => {
+      const { fromIndex, toIndex } = action.payload;
+      const [movedRunner] = state.runner.splice(fromIndex, 1);
+      state.runner.splice(toIndex, 0, movedRunner);
     },
   },
 });
@@ -181,10 +273,12 @@ export const {
   addFunctionAction,
   updateFunctionAction,
   removeFunctionAction,
+  reorderFunctionActions,
   createSetRunner,
   createCallRunner,
   updateRunner,
   removeRunner,
+  reorderRunnerSteps,
 } = editorSlice.actions;
 
 // Export the reducer

@@ -1,20 +1,14 @@
 "use client";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
-import { useEffect, useState } from "react";
-import {
-  IconArrowMerge,
-  IconBox,
-  IconCircleDashedPlus,
-  IconEyeMinus,
-  IconEyePlus,
-  IconFileTypography,
-  IconX,
-} from "@tabler/icons-react";
+import { IconEyeMinus, IconEyePlus, IconInfoCircle } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
 import { updateDataType } from "@/state/slices/editorSlice";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircleIcon } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -22,132 +16,120 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { addLog } from "@/state/slices/logSlice";
+import { cn } from "@/lib/utils";
+import React from "react";
+
+const InstructionPanel = () => {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "flex items-center gap-1.5 w-full text-left text-blue-700 font-medium text-xs",
+            "rounded-md border border-blue-200 bg-blue-50 p-2",
+            "transition-all duration-200 hover:shadow-sm hover:text-blue-800",
+          )}
+        >
+          <IconInfoCircle size={13} />
+          What can I do here?
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80" align="start">
+        <div className="space-y-2 text-xs">
+          <p className="text-blue-900">
+            Assign a data type to each variable. Variables without a type can't
+            be used in runner steps.
+          </p>
+          <p className="text-blue-700">
+            Tip: use{" "}
+            <code className="bg-blue-100 px-1 rounded">myVar:string</code>{" "}
+            inline when creating variables.
+          </p>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 const DataTypeContainer = () => {
   const dispatch = useAppDispatch();
   const variables = useAppSelector((state) => state.editor.variables);
   const dataTypes = useAppSelector((state) => state.editor.dataTypes);
-  const [selectedVariable, setSelectedVariable] = useState("");
-  const [selectedDataType, setSelectedDataType] = useState("");
-  const [showDetail, setShowDetail] = useState(false);
+  const [showDetail, setShowDetail] = React.useState(true);
 
-  useEffect(() => {
-    if (selectedVariable.trim() === "") {
-      setShowDetail(false);
-      setSelectedDataType("");
-    }
-  }, [selectedVariable]);
+  const typedCount = variables.filter((v) => v.type).length;
+  const totalCount = variables.length;
 
-  const handleAddVariable = () => {
-    if (selectedVariable.trim() === "") {
-      dispatch(
-        addLog({ type: "warning", message: "Variable name cannot be empty" })
-      );
-      return;
-    }
-
-    if (selectedDataType.trim() === "") {
-      dispatch(
-        addLog({ type: "warning", message: "Data type cannot be empty" })
-      );
-      return;
-    }
-
-    dispatch(
-      updateDataType({ name: selectedVariable, type: selectedDataType })
-    );
-  };
-
-  const handleUpdateDataType = (variable: string) => {
-    setSelectedVariable(variable);
-    setSelectedDataType(variables.find((v) => v.name === variable)?.type || "");
-  };
-
-  const handleShowDetail = () => {
-    setShowDetail(!showDetail);
+  const handleChange = (variableId: string, type: string) => {
+    dispatch(updateDataType({ id: variableId, type }));
   };
 
   return (
-    <div className="w-full p-2 shadow-md shadow-slate-200 rounded-md space-y-2">
-      <div className="flex flex-row gap-2">
-        <Badge variant="secondary"> Data Type</Badge>
-        <Badge variant="outline">
-          {variables.filter((v) => v.type).length}
+    <div className="w-full p-2 shadow-md shadow-slate-200 rounded-md space-y-1.5">
+      <InstructionPanel />
+      <div className="flex flex-row gap-1.5 items-center">
+        <Badge variant="secondary" className="text-xs py-0">
+          Data Types
         </Badge>
-      </div>
-      <div className="flex items-center justify-between gap-2">
-        <IconBox size={16} className="shrink-0" />
-        <Select
+        <Badge variant="outline" className="text-xs py-0">
+          {typedCount}/{totalCount}
+        </Badge>
+        {typedCount < totalCount && totalCount > 0 && (
+          <span className="text-xs text-amber-600">
+            {totalCount - typedCount} untyped
+          </span>
+        )}
+        <Button
+          size="icon"
+          variant="ghost"
+          className="ml-auto h-6 w-6"
           disabled={!variables.length}
-          value={selectedVariable}
-          onValueChange={setSelectedVariable}
+          onClick={() => setShowDetail((v) => !v)}
         >
-          <SelectTrigger className="flex-1">
-            <SelectValue placeholder="Variables" />
-          </SelectTrigger>
-          <SelectContent>
-            {variables.map((variable) => {
-              return (
-                <SelectItem key={variable.name} value={variable.name}>
+          {showDetail ? <IconEyeMinus size={14} /> : <IconEyePlus size={14} />}
+        </Button>
+      </div>
+
+      {variables.length === 0 ? (
+        <p className="text-xs text-muted-foreground py-2 border border-dashed rounded-md text-center">
+          No variables yet.
+        </p>
+      ) : showDetail ? (
+        <div className="space-y-0.5">
+          {variables.map((variable) => (
+            <div
+              key={variable.id}
+              className="flex items-center justify-between gap-2 rounded px-1.5 py-0.5 hover:bg-muted/50"
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    variable.type ? "bg-green-500" : "bg-amber-400"
+                  }`}
+                />
+                <span className="text-xs font-mono truncate">
                   {variable.name}
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-        <IconFileTypography size={16} className="shrink-0" />
-        <Select
-          disabled={!variables.length}
-          value={selectedDataType}
-          onValueChange={setSelectedDataType}
-        >
-          <SelectTrigger className="flex-1">
-            <SelectValue placeholder="Data Types" />
-          </SelectTrigger>
-          <SelectContent>
-            {dataTypes.map((type) => {
-              return (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-        <Button
-          disabled={!variables.length}
-          onClick={handleAddVariable}
-          size="icon"
-        >
-          <IconArrowMerge size={16} className="shrink-0" />
-        </Button>
-        <Button
-          disabled={!variables.length || variables.every((v) => !v.type)}
-          onClick={handleShowDetail}
-          size="icon"
-        >
-          {showDetail ? <IconEyeMinus size={16} /> : <IconEyePlus size={16} />}
-        </Button>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {showDetail &&
-          variables
-            .filter((variable) => variable.type !== "")
-            .map((variable) => (
-              <Badge
-                key={variable.name}
-                variant="outline"
-                className="group transition-all duration-300 ease-in-out hover:bg-accent hover:text-accent-foreground cursor-pointer space-x-1 p-2"
-                onClick={() => handleUpdateDataType(variable.name)}
+                </span>
+              </div>
+              <Select
+                value={variable.type || ""}
+                onValueChange={(value) => handleChange(variable.id, value)}
               >
-                <p className="text-sm">{variable.name}</p>
-                <Badge variant="outline" className="bg-blue-500 text-white">
-                  <p className="text-sm">{variable.type}</p>
-                </Badge>
-              </Badge>
-            ))}
-      </div>
+                <SelectTrigger className="w-[90px] h-6 text-xs border-0 bg-muted/60 focus:ring-0">
+                  <SelectValue placeholder="no type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dataTypes.map((type) => (
+                    <SelectItem key={type} value={type} className="text-xs">
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 };

@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import {
   IconArrowLeftSquareFilled,
   IconArrowsDown,
-  IconBox,
   IconEqual,
+  IconGripVertical,
+  IconInfoCircle,
   IconRun,
   IconSquareFilled,
   IconTrash,
@@ -15,9 +16,15 @@ import {
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { Badge } from "@/components/ui/badge";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   createCallRunner,
   createSetRunner,
   removeRunner,
+  reorderRunnerSteps,
 } from "@/state/slices/editorSlice";
 import {
   Select,
@@ -32,131 +39,297 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useRunner } from "@/hooks/useRunner";
 
-const RunnerInput = (payload: { runnerIndex: number }) => {
+const InstructionPanel = () => {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={cn(
+            "flex items-center gap-1.5 w-full text-left text-blue-700 font-medium text-xs",
+            "rounded-md border border-blue-200 bg-blue-50 p-2",
+            "transition-all duration-200 hover:shadow-sm hover:text-blue-800",
+          )}
+        >
+          <IconInfoCircle size={13} />
+          What can I do here?
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80" align="start">
+        <div className="space-y-2 text-xs">
+          <p className="text-blue-900">
+            Compose ordered steps and execute them. Steps run top to bottom.
+          </p>
+          <ul className="list-disc list-inside space-y-0.5 text-blue-800">
+            <li>
+              <IconTriangleFilled size={9} className="inline mr-1" />
+              <strong>Set Variable</strong> — assign a value
+            </li>
+            <li>
+              <IconSquareFilled size={9} className="inline mr-1" />
+              <strong>Call Function</strong> — run a function on a variable
+            </li>
+          </ul>
+          <p className="text-blue-700">
+            All variables must be typed before running.
+          </p>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+const SET_VALUE_HINTS: Record<string, string> = {
+  string: "Plain text — e.g. hello world",
+  array: "Comma-separated — e.g. a, b, c",
+  number: "A number — e.g. 42",
+  boolean: "true or false",
+  object: 'JSON — e.g. {"key":"value"}',
+};
+
+const RunnerInput = (payload: {
+  runner: any;
+  runnerIndex: number;
+  onDragStart: (index: number) => void;
+  onDragOver: (e: React.DragEvent, index: number) => void;
+  onDragEnd: () => void;
+  onDrop: (index: number) => void;
+  isDragging: boolean;
+  isDragOver: boolean;
+}) => {
   const dispatch = useAppDispatch();
   const variables = useAppSelector((state) => state.editor.variables);
   const functions = useAppSelector((state) => state.editor.functions);
-  const runner = useAppSelector((state) => state.editor.runner);
   const [value, setValue] = useState<string>("");
+  const [args, setArgs] = useState<string>("");
+  const [showArgSuggestions, setShowArgSuggestions] = useState(false);
+  const argsInputRef = React.useRef<HTMLInputElement>(null);
 
-  const runnerType = useMemo(() => {
-    return runner[payload.runnerIndex].type;
-  }, [runner, payload.runnerIndex]);
+  const runnerType = useMemo(() => payload.runner.type, [payload.runner]);
+  const runnerTarget = useMemo(() => payload.runner.target, [payload.runner]);
+  const runnerArgs = useMemo(() => payload.runner.args, [payload.runner]);
 
-  const runnerTarget = useMemo(() => {
-    return runner[payload.runnerIndex].target;
-  }, [runner, payload.runnerIndex]);
+  const selectedVar = useMemo(
+    () => variables.find((v) => v.name === runnerTarget[0]),
+    [variables, runnerTarget],
+  );
+  const varType = selectedVar?.type ?? "";
 
   const funcList = useMemo(() => {
-    const varType = variables.find((v) => v.name === runnerTarget[0])?.type;
-    return functions
-      .filter((func) => func.dataType === varType)
-      .map((func) => func.name);
-  }, [functions, runnerTarget]);
+    if (!selectedVar) return [];
+    return functions.map((func) => func.name);
+  }, [functions, selectedVar]);
 
   const handleUpdateRunner = (
-    runnerIndex: number,
-    target: [string, string]
+    runnerId: string,
+    target: [string, string],
+    args: string[],
   ) => {
     dispatch(
-      updateRunner({
-        runnerIndex,
-        target,
-      })
+      updateRunner({ runnerId, runner: { ...payload.runner, target, args } }),
     );
   };
 
-  const handleRemoveRunner = (runnerIndex: number) => {
-    dispatch(removeRunner(runnerIndex));
-  };
-
   const debouncedUpdateRunner = useDebounce(handleUpdateRunner, 300);
+  const isSet = runnerType === "set";
+
+  const insertArgVar = (varName: string) => {
+    const current = argsInputRef.current?.value ?? args;
+    const newArgs = current.trim() ? `${current.trim()}, ${varName}` : varName;
+    setArgs(newArgs);
+    setShowArgSuggestions(false);
+    debouncedUpdateRunner(
+      payload.runner.id,
+      [runnerTarget[0], runnerTarget[1]],
+      newArgs.split(",").map((v) => v.trim()),
+    );
+    setTimeout(() => argsInputRef.current?.focus(), 0);
+  };
 
   return (
     <>
       <div
         className={cn(
-          "flex flex-row justify-start mb-0 pl-2",
-          payload.runnerIndex === 0 && "hidden"
+          "flex pl-2 text-muted-foreground",
+          payload.runnerIndex === 0 && "hidden",
         )}
       >
-        <IconArrowsDown size={16} className="shrink-0" />
+        <IconArrowsDown size={13} className="shrink-0" />
       </div>
-      <div className="flex flex-row gap-2 shadow-md shadow-slate-200 rounded-md p-2 items-center">
-        {runnerType === "set" ? (
-          <IconTriangleFilled size={16} className="shrink-0" />
-        ) : (
-          <IconSquareFilled size={16} className="shrink-0" />
+
+      <div
+        draggable
+        onDragStart={() => payload.onDragStart(payload.runnerIndex)}
+        onDragOver={(e) => payload.onDragOver(e, payload.runnerIndex)}
+        onDragEnd={payload.onDragEnd}
+        onDrop={() => payload.onDrop(payload.runnerIndex)}
+        className={cn(
+          "rounded border p-1.5 space-y-1.5 transition-all cursor-move",
+          payload.isDragging && "opacity-40 scale-95",
+          payload.isDragOver && "border-blue-400 bg-blue-50 border-2",
+        )}
+      >
+        {/* Header */}
+        <div className="flex items-center gap-1.5">
+          <IconGripVertical
+            size={14}
+            className="shrink-0 text-muted-foreground cursor-grab active:cursor-grabbing"
+          />
+          <span className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0 rounded">
+            {payload.runnerIndex + 1}
+          </span>
+          <Badge variant="secondary" className="gap-1 text-xs py-0">
+            {isSet ? (
+              <IconTriangleFilled size={9} />
+            ) : (
+              <IconSquareFilled size={9} />
+            )}
+            {isSet ? "Set" : "Call"}
+          </Badge>
+          <Button
+            variant="destructive"
+            size="icon"
+            onClick={() => dispatch(removeRunner(payload.runner.id))}
+            className="ml-auto h-5 w-5"
+          >
+            <IconTrash size={11} />
+          </Button>
+        </div>
+
+        {/* Fields */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Select
+            value={runnerTarget[0]}
+            onValueChange={(v) =>
+              debouncedUpdateRunner(
+                payload.runner.id,
+                [v, runnerTarget[1]],
+                runnerArgs,
+              )
+            }
+          >
+            <SelectTrigger className="w-[120px] h-7 text-xs">
+              <SelectValue placeholder="variable" />
+            </SelectTrigger>
+            <SelectContent>
+              {variables.map((v) => (
+                <SelectItem key={v.id} value={v.name} className="text-xs">
+                  {v.name}
+                  {v.type && (
+                    <span className="text-muted-foreground ml-1">
+                      :{v.type}
+                    </span>
+                  )}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {isSet ? (
+            <div className="flex items-center gap-1 flex-1 min-w-[80px]">
+              <IconEqual size={12} className="shrink-0 text-muted-foreground" />
+              <Input
+                value={value}
+                placeholder="value"
+                className="h-7 text-xs"
+                onChange={(e) => {
+                  setValue(e.target.value);
+                  debouncedUpdateRunner(
+                    payload.runner.id,
+                    [runnerTarget[0], e.target.value],
+                    runnerArgs,
+                  );
+                }}
+              />
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-1 flex-1">
+                <IconArrowLeftSquareFilled
+                  size={12}
+                  className="shrink-0 text-muted-foreground"
+                />
+                <Select
+                  value={runnerTarget[1]}
+                  onValueChange={(v) =>
+                    debouncedUpdateRunner(
+                      payload.runner.id,
+                      [runnerTarget[0], v],
+                      runnerArgs,
+                    )
+                  }
+                >
+                  <SelectTrigger className="h-7 text-xs w-full">
+                    <SelectValue placeholder="function" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {funcList.map((fn, i) => (
+                      <SelectItem key={i} value={fn} className="text-xs">
+                        {fn}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Input
+                ref={argsInputRef}
+                placeholder="args (variables)"
+                className="h-7 text-xs flex-1 min-w-[70px]"
+                value={args}
+                onFocus={() => setShowArgSuggestions(true)}
+                onBlur={() =>
+                  setTimeout(() => setShowArgSuggestions(false), 150)
+                }
+                onChange={(e) => {
+                  setArgs(e.target.value);
+                  debouncedUpdateRunner(
+                    payload.runner.id,
+                    [runnerTarget[0], runnerTarget[1]],
+                    e.target.value.split(",").map((v) => v.trim()),
+                  );
+                }}
+              />
+            </>
+          )}
+        </div>
+
+        {/* Set hint: show variable type and expected format */}
+        {isSet && varType && (
+          <div className="rounded bg-slate-50 border border-slate-200 px-2 py-1 text-xs flex items-center gap-1.5">
+            <span className="bg-slate-200 text-slate-700 px-1.5 rounded font-mono text-[11px]">
+              {varType}
+            </span>
+            <span className="text-slate-500">
+              {SET_VALUE_HINTS[varType] ?? "Enter a value"}
+            </span>
+          </div>
         )}
 
-        <IconBox size={16} className="shrink-0" />
-
-        <Select
-          value={runnerTarget[0]}
-          onValueChange={(value) =>
-            debouncedUpdateRunner(payload.runnerIndex, [value, runnerTarget[1]])
-          }
-        >
-          <SelectTrigger className="w-[150px] shrink-0">
-            <SelectValue placeholder="Target Variable" />
-          </SelectTrigger>
-          <SelectContent>
-            {variables.map((variable, index) => (
-              <SelectItem key={index} value={variable.name}>
-                {variable.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {runnerType === "set" ? (
-          <>
-            <IconEqual size={16} className="shrink-0" />
-            <Input
-              value={value}
-              placeholder="Value"
-              className="flex-1"
-              onChange={(e) => {
-                setValue(e.target.value);
-                debouncedUpdateRunner(payload.runnerIndex, [
-                  runnerTarget[0],
-                  e.target.value,
-                ]);
-              }}
-            />
-          </>
-        ) : (
-          <>
-            <IconArrowLeftSquareFilled size={16} className="shrink-0" />
-            <Select
-              value={runnerTarget[1]}
-              onValueChange={(value) =>
-                debouncedUpdateRunner(payload.runnerIndex, [
-                  runnerTarget[0],
-                  value,
-                ])
-              }
-            >
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Use Function" />
-              </SelectTrigger>
-              <SelectContent>
-                {funcList.map((func, index) => (
-                  <SelectItem key={index} value={func}>
-                    {func}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </>
+        {/* Call args: variable name chips */}
+        {!isSet && showArgSuggestions && variables.length > 0 && (
+          <div className="rounded bg-slate-50 border border-slate-200 p-2 text-xs space-y-1">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+              variables
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {variables.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    insertArgVar(v.name);
+                  }}
+                  className="font-mono text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                >
+                  {v.name}
+                  {v.type && (
+                    <span className="text-slate-400 ml-0.5">:{v.type}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
-
-        <Button
-          variant="destructive"
-          onClick={() => handleRemoveRunner(payload.runnerIndex)}
-        >
-          <IconTrash size={16} className="shrink-0" />
-        </Button>
       </div>
     </>
   );
@@ -168,55 +341,116 @@ const RunnerDefiner = () => {
   const functions = useAppSelector((state) => state.editor.functions);
   const runner = useAppSelector((state) => state.editor.runner);
   const { run } = useRunner();
+  const [dragState, setDragState] = React.useState<{
+    dragIndex: number | null;
+    dragOverIndex: number | null;
+  }>({ dragIndex: null, dragOverIndex: null });
 
-  const handleSetRunner = () => {
-    dispatch(createSetRunner());
+  const allTyped = variables.length > 0 && variables.every((v) => v.type);
+  const runDisabled =
+    !runner.length || !runner.every((r) => r.target[0] && r.target[1]);
+
+  const handleDragStart = (index: number) => {
+    setDragState({ dragIndex: index, dragOverIndex: null });
   };
 
-  const handleCallRunner = () => {
-    dispatch(createCallRunner());
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (dragState.dragIndex !== index) {
+      setDragState((prev) => ({ ...prev, dragOverIndex: index }));
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDragState({ dragIndex: null, dragOverIndex: null });
+  };
+
+  const handleDrop = (toIndex: number) => {
+    if (dragState.dragIndex !== null && dragState.dragIndex !== toIndex) {
+      dispatch(
+        reorderRunnerSteps({
+          fromIndex: dragState.dragIndex,
+          toIndex,
+        }),
+      );
+    }
+    setDragState({ dragIndex: null, dragOverIndex: null });
   };
 
   return (
-    <div className="w-full space-y-2">
-      <div className="flex flex-row gap-2">
-        <Badge variant="secondary">Runner Steps</Badge>
-        <Badge variant="outline">{runner.length}</Badge>
+    <div className="w-full space-y-1.5">
+      <InstructionPanel />
+
+      <div className="flex items-center gap-1.5">
+        <Badge variant="secondary" className="text-xs py-0">
+          Runner
+        </Badge>
+        <Badge variant="outline" className="text-xs py-0">
+          {runner.length} {runner.length === 1 ? "step" : "steps"}
+        </Badge>
       </div>
-      <div className="flex flex-row gap-2 shadow-md shadow-slate-200 rounded-md p-2">
+
+      <div className="flex gap-1.5 rounded-md border p-1.5">
         <Button
           variant="outline"
-          className="flex-1"
-          disabled={!variables.length || !variables.every((v) => v.type)}
-          onClick={handleSetRunner}
+          className="flex-1 h-7 text-xs gap-1"
+          disabled={!allTyped}
+          onClick={() => dispatch(createSetRunner())}
+          title={
+            !allTyped
+              ? "All variables need a type first"
+              : "Add a Set Variable step"
+          }
         >
-          <IconTriangleFilled size={16} className="shrink-0" />
+          <IconTriangleFilled size={12} />
           Set Variable
         </Button>
         <Button
           variant="outline"
-          className="flex-1"
+          className="flex-1 h-7 text-xs gap-1"
           disabled={!functions.length}
-          onClick={handleCallRunner}
+          onClick={() => dispatch(createCallRunner())}
+          title={
+            !functions.length
+              ? "Create functions first"
+              : "Add a Call Function step"
+          }
         >
-          <IconSquareFilled size={16} className="shrink-0" />
+          <IconSquareFilled size={12} />
           Call Function
         </Button>
         <Button
           variant="default"
-          disabled={
-            !runner.length || !runner.every((r) => r.target[0] && r.target[1])
-          }
+          className="h-7 text-xs gap-1"
+          disabled={runDisabled}
           onClick={run}
+          title={runDisabled ? "Complete all steps first" : "Execute all steps"}
         >
-          <IconRun size={16} className="shrink-0" />
+          <IconRun size={12} />
           Run
         </Button>
       </div>
 
-      {runner.map((run, index) => (
-        <RunnerInput key={index} runnerIndex={index} />
-      ))}
+      {runner.length === 0 ? (
+        <p className="text-xs text-muted-foreground text-center py-3 border border-dashed rounded-md">
+          No steps yet — add <strong>Set Variable</strong> or{" "}
+          <strong>Call Function</strong>.
+        </p>
+      ) : (
+        runner.map((r, index) => (
+          <RunnerInput
+            key={r.id}
+            runner={r}
+            runnerIndex={index}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            onDrop={handleDrop}
+            isDragging={dragState.dragIndex === index}
+            isDragOver={dragState.dragOverIndex === index}
+          />
+        ))
+      )}
     </div>
   );
 };

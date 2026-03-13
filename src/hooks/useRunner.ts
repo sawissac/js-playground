@@ -1,9 +1,9 @@
 "use client";
 
-import { fnRunner } from "@/lib/function-utils";
+import { fnRunner, deepClone } from "@/lib/function-utils";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { updateVariableValue } from "@/state/slices/editorSlice";
-import { addLog } from "@/state/slices/logSlice";
+import { addLog, clearLogs } from "@/state/slices/logSlice";
 
 export const useRunner = () => {
   const variables = useAppSelector((state) => state.editor.variables);
@@ -12,15 +12,23 @@ export const useRunner = () => {
   const dispatch = useAppDispatch();
 
   const run = () => {
+    dispatch(clearLogs());
     try {
-      // Create a local copy of variables to track updates during execution
-      const updatedVariables = [...variables];
+      const updatedVariables = variables.map((v) => ({
+        ...v,
+        value: deepClone(v.value),
+      }));
 
       for (const run of runner) {
         if (run.type === "set") {
-          const variableIndex = updatedVariables.findIndex((v) => v.name === run.target[0]);
+          const variable = updatedVariables.find(
+            (v) => v.name === run.target[0],
+          );
+          const variableIndex = updatedVariables.findIndex(
+            (v) => v.name === run.target[0],
+          );
 
-          if (variableIndex === -1) {
+          if (variableIndex === -1 || !variable) {
             throw new Error(`Variable ${run.target[0]} not found`);
           }
 
@@ -28,26 +36,53 @@ export const useRunner = () => {
             addLog({
               type: "info",
               message: `Setting variable ${run.target[0]} to ${run.target[1]}`,
-            })
+            }),
           );
 
-          // Update local copy of variables with new value
+          const dataType = variables.find(
+            (v) => v.name === run.target[0],
+          )?.type;
+
+          let valueReturn = null;
+
+          switch (dataType) {
+            case "string":
+              valueReturn = run.target[1];
+              break;
+            case "array":
+              valueReturn = run.target[1].split(",").map((v) => v.trim());
+              break;
+            case "number":
+              valueReturn = Number(run.target[1]);
+              break;
+            case "boolean":
+              valueReturn = run.target[1] === "true";
+              break;
+            case "object":
+              valueReturn = JSON.parse(run.target[1]);
+              break;
+            default:
+              valueReturn = run.target[1];
+          }
+
           updatedVariables[variableIndex] = {
             ...updatedVariables[variableIndex],
-            value: run.target[1],
+            value: valueReturn,
           };
 
           dispatch(
             updateVariableValue({
-              name: run.target[0],
-              value: run.target[1],
-            })
+              id: variable.id,
+              value: valueReturn,
+            }),
           );
         }
 
         if (run.type === "call") {
-          // Use the updated local copy instead of the Redux state
-          const variable = updatedVariables.find((v) => v.name === run.target[0]);
+          const variable = updatedVariables.find(
+            (v) => v.name === run.target[0],
+          );
+
           const func = functions.find((f) => f.name === run.target[1]);
 
           if (!variable) {
@@ -58,17 +93,35 @@ export const useRunner = () => {
             throw new Error(`Function ${run.target[1]} not found`);
           }
 
+          let message = `Function ${run.target[1]} called with`;
+
+          if (variable.value) {
+            message += ` value ${variable.value} and`;
+          }
+
+          if (run.args.length) {
+            message += ` args ${run.args.join(",")}`;
+          }
+
           dispatch(
             addLog({
               type: "info",
-              message: `Function ${run.target[1]} called with value ${variable.value}`,
-            })
+              message,
+            }),
           );
 
-          const result = fnRunner(variable.value, func.actions);
+          const result = fnRunner(
+            deepClone(variable.value),
+            run.args.map((arg) =>
+              deepClone(updatedVariables.find((v) => v.name === arg)?.value),
+            ),
+            func.actions,
+          );
 
-          // Update local copy with result
-          const resultVarIndex = updatedVariables.findIndex((v) => v.name === variable.name);
+          const resultVarIndex = updatedVariables.findIndex(
+            (v) => v.name === variable.name,
+          );
+
           if (resultVarIndex !== -1) {
             updatedVariables[resultVarIndex] = {
               ...updatedVariables[resultVarIndex],
@@ -78,16 +131,16 @@ export const useRunner = () => {
 
           dispatch(
             updateVariableValue({
-              name: variable.name,
+              id: variable.id,
               value: result,
-            })
+            }),
           );
 
           dispatch(
             addLog({
               type: "info",
               message: `Result: ${result}`,
-            })
+            }),
           );
         }
       }
@@ -96,7 +149,7 @@ export const useRunner = () => {
         addLog({
           type: "error",
           message: error.message,
-        })
+        }),
       );
     }
   };
