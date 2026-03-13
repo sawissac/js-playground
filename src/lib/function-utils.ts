@@ -160,10 +160,13 @@ function unwrapPrimitive(value: any): any {
   return value;
 }
 
+const CALL_PREFIX = "call:";
+
 export function fnRunner(
   payload: any,
   args: any[],
   actions: FunctionActionInterface[],
+  allFunctions?: { name: string; actions: FunctionActionInterface[] }[],
 ): any {
   try {
     let temp: any = deepClone(payload);
@@ -173,11 +176,24 @@ export function fnRunner(
 
     // Define action handlers to make the code more maintainable
     const actionHandlers: ActionHandler[] = [
+      // Cross-function call handler
+      {
+        condition: ({ name }) => name.startsWith(CALL_PREFIX),
+        process: ({ name, value }, { temp, args, mathTemp, tempVar, stepResults }) => {
+          const targetName = name.slice(CALL_PREFIX.length);
+          const targetFunc = allFunctions?.find((f) => f.name === targetName);
+          if (!targetFunc)
+            throw new Error(`Function "${targetName}" not found`);
+          const parsedArgs = uniqueIdentifier(value, args, temp, mathTemp, tempVar, stepResults);
+          return fnRunner(deepClone(temp), parsedArgs, targetFunc.actions, allFunctions);
+        },
+      },
       // Function call handler
       {
         condition: (action, temp) => {
           if (["math", "temp", "return", "use"].includes(action.name))
             return false;
+          if (action.name.startsWith(CALL_PREFIX)) return false;
           if (temp == null) return false;
 
           const wrapped = wrapPrimitive(temp);
@@ -279,7 +295,7 @@ export function fnRunner(
       },
       // Property access handler (default)
       {
-        condition: () => true,
+        condition: ({ name }) => !name.startsWith(CALL_PREFIX),
         process: ({ name }, { temp }) => {
           if (temp == null) return undefined;
 

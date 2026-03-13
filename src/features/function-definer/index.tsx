@@ -422,20 +422,30 @@ const MAGIC_INDICATORS: Record<
   },
 };
 
+const CALL_PREFIX = "call:";
+const CALL_INDICATOR = {
+  dot: "bg-emerald-400",
+  badge: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  label: "fn",
+};
+
 const MethodItem = ({
   name,
   params,
   isMagic,
+  isCall,
   isSelected,
   onSelect,
 }: {
   name: string;
   params: string | number;
   isMagic: boolean;
+  isCall?: boolean;
   isSelected: boolean;
   onSelect: (v: string) => void;
 }) => {
   const info = isMagic ? MAGIC_INDICATORS[name as MagicName] : null;
+  const displayName = isCall ? name.slice(CALL_PREFIX.length) : name;
   return (
     <button
       type="button"
@@ -447,13 +457,23 @@ const MethodItem = ({
     >
       {isMagic && info ? (
         <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", info.dot)} />
+      ) : isCall ? (
+        <span
+          className={cn(
+            "w-1.5 h-1.5 rounded-full shrink-0",
+            CALL_INDICATOR.dot,
+          )}
+        />
       ) : (
         <span className="w-1.5 shrink-0" />
       )}
       <span
-        className={cn("flex-1 font-mono text-xs", isMagic && "font-semibold")}
+        className={cn(
+          "flex-1 font-mono text-xs",
+          (isMagic || isCall) && "font-semibold",
+        )}
       >
-        {name}
+        {displayName}
       </span>
       <span
         className={cn(
@@ -511,13 +531,23 @@ const MethodSelector = ({
   const magic = funcList.filter((fn) =>
     MAGIC_NAMES.includes(fn.name as MagicName),
   );
+  const callable = funcList.filter((fn) =>
+    String(fn.name).startsWith(CALL_PREFIX),
+  );
   const builtin = funcList.filter(
-    (fn) => !MAGIC_NAMES.includes(fn.name as MagicName),
+    (fn) =>
+      !MAGIC_NAMES.includes(fn.name as MagicName) &&
+      !String(fn.name).startsWith(CALL_PREFIX),
   );
   const q = search.toLowerCase();
   const filteredMagic = q
     ? magic.filter((fn) => String(fn.name).includes(q))
     : magic;
+  const filteredCallable = q
+    ? callable.filter((fn) =>
+        String(fn.name).slice(CALL_PREFIX.length).includes(q),
+      )
+    : callable;
   const filteredBuiltin = q
     ? builtin.filter((fn) => String(fn.name).includes(q))
     : builtin;
@@ -526,6 +556,8 @@ const MethodSelector = ({
   const magicInfo = isMagicSelected
     ? MAGIC_INDICATORS[value as MagicName]
     : null;
+  const isCallSelected = value.startsWith(CALL_PREFIX);
+  const callTarget = isCallSelected ? value.slice(CALL_PREFIX.length) : null;
   const selectedFn = funcList.find((fn) => fn.name === value);
 
   return (
@@ -537,7 +569,9 @@ const MethodSelector = ({
           "h-7 text-xs flex items-center gap-1 px-2 rounded border w-[130px]",
           isMagicSelected && magicInfo
             ? magicInfo.badge
-            : "border-input bg-background text-foreground hover:bg-accent",
+            : isCallSelected
+              ? CALL_INDICATOR.badge
+              : "border-input bg-background text-foreground hover:bg-accent",
         )}
       >
         {isMagicSelected && magicInfo && (
@@ -545,9 +579,21 @@ const MethodSelector = ({
             className={cn("w-1.5 h-1.5 rounded-full shrink-0", magicInfo.dot)}
           />
         )}
+        {isCallSelected && (
+          <span
+            className={cn(
+              "w-1.5 h-1.5 rounded-full shrink-0",
+              CALL_INDICATOR.dot,
+            )}
+          />
+        )}
         <span className="flex-1 text-left font-mono text-xs truncate">
           {value ? (
-            value
+            isCallSelected ? (
+              callTarget
+            ) : (
+              value
+            )
           ) : (
             <span className="text-muted-foreground font-sans">method</span>
           )}
@@ -597,6 +643,27 @@ const MethodSelector = ({
                 ))}
               </div>
             )}
+            {filteredCallable.length > 0 && (
+              <div>
+                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide px-2 pt-1.5 pb-0.5">
+                  Call Function
+                </p>
+                {filteredCallable.map((fn) => (
+                  <MethodItem
+                    key={fn.name}
+                    name={String(fn.name)}
+                    params={fn.params}
+                    isMagic={false}
+                    isCall
+                    isSelected={value === fn.name}
+                    onSelect={(v) => {
+                      onChange(v);
+                      setOpen(false);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
             {filteredBuiltin.length > 0 && (
               <div>
                 {funcDataType && (
@@ -619,11 +686,13 @@ const MethodSelector = ({
                 ))}
               </div>
             )}
-            {filteredMagic.length === 0 && filteredBuiltin.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-3">
-                No methods found
-              </p>
-            )}
+            {filteredMagic.length === 0 &&
+              filteredCallable.length === 0 &&
+              filteredBuiltin.length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-3">
+                  No methods found
+                </p>
+              )}
           </div>
         </div>
       )}
@@ -639,6 +708,7 @@ const SuggestionPanel = ({
   atQuery,
   atTokens,
   showExamples,
+  inputValue,
   onTokenSelect,
   onExampleSelect,
 }: {
@@ -647,10 +717,18 @@ const SuggestionPanel = ({
   atQuery: string | null;
   atTokens: { token: string; desc: string }[];
   showExamples: boolean;
+  inputValue: string;
   onTokenSelect: (token: string) => void;
   onExampleSelect: (expr: string) => void;
 }) => {
-  const info = METHOD_DESCRIPTIONS[methodName] ?? null;
+  const isCallAction = methodName.startsWith(CALL_PREFIX);
+  const callTarget = isCallAction ? methodName.slice(CALL_PREFIX.length) : null;
+  const info = isCallAction
+    ? {
+        desc: `Calls function "${callTarget}" with current value as input. Returns its result.`,
+        params: ["...args"],
+      }
+    : (METHOD_DESCRIPTIONS[methodName] ?? null);
   const filteredTokens =
     atQuery !== null && atQuery !== undefined
       ? atTokens.filter((t) => {
@@ -721,8 +799,8 @@ const SuggestionPanel = ({
         </div>
       )}
 
-      {/* Quick-insert for return / use — show when no @-query is active */}
-      {(methodName === "return" || methodName === "use") && !hasTokens && (
+      {/* Quick-insert for return / use — show when no @-query is active and input is empty */}
+      {(methodName === "return" || methodName === "use") && !hasTokens && !inputValue && (
         <div className="space-y-1">
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
             quick insert
@@ -834,6 +912,11 @@ const FunctionActionInput = (payload: {
     setValue(funcValue);
   }, [funcValue]);
 
+  const callableFunctions = useMemo(
+    () => functions.filter((fn) => fn.id !== payload.functionId),
+    [functions, payload.functionId],
+  );
+
   const funcList = useMemo(() => {
     let typedFunctions: readonly (readonly [
       string | number,
@@ -856,17 +939,23 @@ const FunctionActionInput = (payload: {
         typedFunctions = ObjectFunctions;
         break;
     }
-    const magic = [
-      ["math", "n"],
-      ["temp", 1],
-      ["return", 1],
-      ["use", 1],
-    ] as const;
-    return [...magic, ...typedFunctions].map((fn) => ({
-      name: fn[0],
-      params: fn[1],
-    }));
-  }, [functions, funcDataType]);
+    const magic: { name: string | number; params: string | number }[] = [
+      { name: "math", params: "n" },
+      { name: "temp", params: 1 },
+      { name: "return", params: 1 },
+      { name: "use", params: 1 },
+    ];
+    const callEntries: { name: string | number; params: string | number }[] =
+      callableFunctions.map((fn) => ({
+        name: `${CALL_PREFIX}${fn.name}`,
+        params: "n",
+      }));
+    return [
+      ...magic,
+      ...callEntries,
+      ...typedFunctions.map((fn) => ({ name: fn[0], params: fn[1] })),
+    ];
+  }, [functions, funcDataType, callableFunctions]);
 
   const paramsCount = useMemo(
     () => funcList.find((fn) => fn.name === funcName)?.params ?? 0,
@@ -1070,6 +1159,7 @@ const FunctionActionInput = (payload: {
         atQuery={atQuery}
         atTokens={atTokens}
         showExamples={showExamples}
+        inputValue={value}
         onTokenSelect={insertToken}
         onExampleSelect={(expr) => {
           setValue(expr);
@@ -1177,7 +1267,12 @@ const InstructionPanel = () => {
 const FunctionDefiner = () => {
   const dispatch = useAppDispatch();
   const functions = useAppSelector((state) => state.editor.functions);
-  const [showDetail, setShowDetail] = React.useState(true);
+  const [showDetails, setShowDetails] = React.useState<Record<string, boolean>>(
+    {},
+  );
+  const isShown = (id: string) => showDetails[id] !== false;
+  const toggleDetail = (id: string) =>
+    setShowDetails((prev) => ({ ...prev, [id]: !isShown(id) }));
   const [dragState, setDragState] = React.useState<{
     functionId: string | null;
     dragIndex: number | null;
@@ -1221,7 +1316,7 @@ const FunctionDefiner = () => {
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 pb-[300px]">
       <InstructionPanel />
 
       {functions.length === 0 ? (
@@ -1259,12 +1354,12 @@ const FunctionDefiner = () => {
                 Add
               </Button>
               <Button
-                onClick={() => setShowDetail((v) => !v)}
+                onClick={() => toggleDetail(func.id)}
                 size="icon"
                 variant="ghost"
                 className="h-6 w-6"
               >
-                {showDetail ? (
+                {isShown(func.id) ? (
                   <IconEyeMinus size={13} />
                 ) : (
                   <IconEyePlus size={13} />
@@ -1272,7 +1367,7 @@ const FunctionDefiner = () => {
               </Button>
             </div>
 
-            <div className={showDetail ? "block" : "hidden"}>
+            <div className={isShown(func.id) ? "block" : "hidden"}>
               {func.actions.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-2 border border-dashed rounded">
                   No actions — click Add to start.

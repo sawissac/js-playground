@@ -116,6 +116,7 @@ export const useRunner = () => {
               deepClone(updatedVariables.find((v) => v.name === arg)?.value),
             ),
             func.actions,
+            functions,
           );
 
           const resultVarIndex = updatedVariables.findIndex(
