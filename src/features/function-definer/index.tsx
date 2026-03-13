@@ -1001,30 +1001,33 @@ const FunctionActionInput = (payload: {
 
       {/* Selectors row */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        {!MAGIC_NAMES.includes(funcName as MagicName) && (
-          <Select
-            defaultValue={payload.actionDataType}
-            value={funcDataType}
-            onValueChange={(v) =>
-              handleDatatype({
-                actionName: funcName,
-                actionDataType: v,
-                actionValue: funcValue,
-              })
-            }
+        <Select
+          defaultValue={payload.actionDataType}
+          value={funcDataType}
+          onValueChange={(v) =>
+            handleDatatype({
+              actionName: funcName,
+              actionDataType: v,
+              actionValue: funcValue,
+            })
+          }
+        >
+          <SelectTrigger
+            className={cn(
+              "w-[90px] h-7 text-xs",
+              !funcDataType && "border-red-400 focus:ring-red-200",
+            )}
           >
-            <SelectTrigger className="w-[90px] h-7 text-xs">
-              <SelectValue placeholder="type" />
-            </SelectTrigger>
-            <SelectContent>
-              {dataTypes.map((dt, i) => (
-                <SelectItem key={i} value={dt} className="text-xs">
-                  {dt}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+            <SelectValue placeholder="type" />
+          </SelectTrigger>
+          <SelectContent>
+            {dataTypes.map((dt, i) => (
+              <SelectItem key={i} value={dt} className="text-xs">
+                {dt}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <MethodSelector
           value={funcName}

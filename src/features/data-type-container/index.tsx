@@ -95,28 +95,26 @@ const DataTypeContainer = () => {
           No variables yet.
         </p>
       ) : showDetail ? (
-        <div className="space-y-0.5">
+        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
           {variables.map((variable) => (
             <div
               key={variable.id}
-              className="flex items-center justify-between gap-2 rounded px-1.5 py-0.5 hover:bg-muted/50"
+              className="flex items-center gap-1 rounded px-1 py-0.5 hover:bg-muted/50 min-w-0"
             >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span
-                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                    variable.type ? "bg-green-500" : "bg-amber-400"
-                  }`}
-                />
-                <span className="text-xs font-mono truncate">
-                  {variable.name}
-                </span>
-              </div>
+              <span
+                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  variable.type ? "bg-green-500" : "bg-amber-400"
+                }`}
+              />
+              <span className="text-[11px] font-mono truncate flex-1 min-w-0">
+                {variable.name}
+              </span>
               <Select
                 value={variable.type || ""}
                 onValueChange={(value) => handleChange(variable.id, value)}
               >
-                <SelectTrigger className="w-[90px] h-6 text-xs border-0 bg-muted/60 focus:ring-0">
-                  <SelectValue placeholder="no type" />
+                <SelectTrigger className="w-[72px] h-5 text-[11px] border-0 bg-muted/60 focus:ring-0 shrink-0 px-1.5">
+                  <SelectValue placeholder="—" />
                 </SelectTrigger>
                 <SelectContent>
                   {dataTypes.map((type) => (

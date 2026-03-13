@@ -62,6 +62,16 @@ const InstructionPanel = () => {
               </code>
             </li>
             <li>
+              <code className="bg-blue-100 px-1 rounded">x(1-3)</code>
+              {" → "}
+              <code className="bg-blue-100 px-1 rounded">x1, x2, x3</code>
+            </li>
+            <li>
+              <code className="bg-blue-100 px-1 rounded">x(1-2):number</code>
+              {" → "}
+              <code className="bg-blue-100 px-1 rounded">x1:number, x2:number</code>
+            </li>
+            <li>
               <kbd className="bg-blue-100 px-1 rounded">Alt/Cmd/Ctrl+1</kbd>{" "}
               focus · <kbd className="bg-blue-100 px-1 rounded">Enter</kbd>{" "}
               submit
@@ -112,6 +122,25 @@ const DataTypeContainer = () => {
     };
   }, []);
 
+  const expandRanges = (input: string): string => {
+    return input
+      .split(",")
+      .flatMap((seg) => {
+        const match = seg.trim().match(/^([^(]+)\((\d+)-(\d+)\)(.*)$/);
+        if (!match) return [seg.trim()];
+        const [, prefix, startStr, endStr, suffix] = match;
+        const start = parseInt(startStr, 10);
+        const end = parseInt(endStr, 10);
+        if (start > end) return [seg.trim()];
+        const results: string[] = [];
+        for (let i = start; i <= end; i++) {
+          results.push(`${prefix.trim()}${i}${suffix.trim()}`);
+        }
+        return results;
+      })
+      .join(", ");
+  };
+
   const handleAddVariable = () => {
     const variableNameLists = variables.map((variable) => variable.name);
     const temp: string[] = [];
@@ -121,20 +150,17 @@ const DataTypeContainer = () => {
       );
       return;
     }
-    if (variableNameLists.includes(newVariable.trim())) {
-      dispatch(
-        addLog({ type: "warning", message: "Variable name already exists" }),
-      );
-      return;
-    }
     if (isEditing) {
       const variable = variables.find((v) => v.name === oldVariable);
       if (variable)
         dispatch(updateVariable({ id: variable.id, newName: newVariable }));
+      handleCancelUpdate();
+      return;
     }
-    const isComma = newVariable.includes(",");
-    if (isComma && !isEditing) {
-      newVariable.split(",").forEach((vc) => {
+    const expanded = expandRanges(newVariable);
+    const isComma = expanded.includes(",");
+    if (isComma) {
+      expanded.split(",").forEach((vc) => {
         if (temp.includes(vc.trim())) {
           dispatch(
             addLog({
@@ -172,10 +198,10 @@ const DataTypeContainer = () => {
         }
       });
     }
-    if (!isEditing && !isComma) {
-      const hasPrefix = newVariable.trim().includes(":");
+    if (!isComma) {
+      const hasPrefix = expanded.trim().includes(":");
       if (hasPrefix) {
-        const [vName, dType] = newVariable.trim().split(":");
+        const [vName, dType] = expanded.trim().split(":");
         if (variableNameLists.includes(vName.trim())) {
           dispatch(
             addLog({
@@ -195,7 +221,7 @@ const DataTypeContainer = () => {
         dispatch(addVariable(p));
         dispatch(updateDataType({ id: p.id, type: dType }));
       } else {
-        dispatch(addVariable({ id: uuidv4(), name: newVariable.trim() }));
+        dispatch(addVariable({ id: uuidv4(), name: expanded.trim() }));
       }
     }
     handleCancelUpdate();
@@ -212,9 +238,26 @@ const DataTypeContainer = () => {
     null,
   );
 
+  const [rangePreview, setRangePreview] = React.useState<string[] | null>(null);
+
   const handleOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setNewVariable(val);
+
+    // Range preview: show expanded names when any segment has name(n-m) pattern
+    const hasRange = val.split(",").some((seg) =>
+      /^[^(]+\(\d+-\d+\).*$/.test(seg.trim()),
+    );
+    if (hasRange) {
+      const expanded = expandRanges(val);
+      setRangePreview(
+        expanded.split(",").map((s) => s.trim()).filter(Boolean),
+      );
+      setTypeSuggestions(null);
+      return;
+    }
+    setRangePreview(null);
+
     // Suggest data types when user is typing after `:` in the last segment
     const lastSegment = val.split(",").pop() ?? "";
     const colonIdx = lastSegment.lastIndexOf(":");
@@ -318,7 +361,7 @@ const DataTypeContainer = () => {
           onChange={handleOnChange}
           onKeyDown={handleKeyDown}
           onBlur={() => setTimeout(() => setTypeSuggestions(null), 150)}
-          placeholder="e.g. myVar:string, count"
+          placeholder="e.g. myVar:string, count, x(1-3)"
           className={cn(
             "h-7 text-xs transition-all duration-200",
             "focus:ring-2 focus:ring-primary/20",
@@ -335,6 +378,29 @@ const DataTypeContainer = () => {
           <IconCircleDashedPlus size={14} />
         </Button>
       </div>
+
+      {rangePreview && rangePreview.length > 0 && (
+        <div
+          className={cn(
+            "rounded-md bg-slate-50 border border-slate-200 p-2 text-xs space-y-1",
+            "animate-in fade-in slide-in-from-top-2 duration-150",
+          )}
+        >
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+            will create
+          </p>
+          <div className="flex gap-1 flex-wrap">
+            {rangePreview.map((name) => (
+              <span
+                key={name}
+                className="font-mono bg-white border border-green-200 rounded px-2 py-0.5 text-[11px] text-green-700"
+              >
+                {name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {typeSuggestions && typeSuggestions.length > 0 && (
         <div
