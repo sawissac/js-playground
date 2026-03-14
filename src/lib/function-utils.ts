@@ -1,14 +1,6 @@
 import { FunctionActionInterface } from "@/state/types";
 import { evaluate } from "mathjs";
 
-type IdentifierContext = {
-  args: any[];
-  temp: any;
-  mathTemp: any[];
-  tempVar: any[];
-  stepResults: any[];
-};
-
 /**
  * Optimized uniqueIdentifier function that resolves variable references
  * using a pattern-matching approach for better performance
@@ -21,15 +13,6 @@ export function uniqueIdentifier(
   tempVar: any[],
   stepResults: any[] = [],
 ): any[] {
-  // Create a context object to avoid passing multiple parameters in recursive calls
-  const context: IdentifierContext = {
-    args,
-    temp,
-    mathTemp,
-    tempVar,
-    stepResults,
-  };
-
   // Define constants for common patterns to improve readability
   const PATTERNS = {
     ARG: /^@arg(\d+)$/,
@@ -108,23 +91,6 @@ export function uniqueIdentifier(
 }
 
 /**
- * Action handler type to improve code organization and readability
- */
-type ActionHandler = {
-  condition: (action: FunctionActionInterface, temp: any) => boolean;
-  process: (
-    action: FunctionActionInterface,
-    context: {
-      temp: any;
-      args: any[];
-      mathTemp: any[];
-      tempVar: any[];
-      stepResults: any[];
-    },
-  ) => any;
-};
-
-/**
  * Optimized function runner with better error handling and type safety
  */
 export function deepClone(value: any): any {
@@ -174,152 +140,174 @@ export function fnRunner(
     const mathTemp: any[] = [];
     const stepResults: any[] = [];
 
-    // Define action handlers to make the code more maintainable
-    const actionHandlers: ActionHandler[] = [
-      // Cross-function call handler
-      {
-        condition: ({ name }) => name.startsWith(CALL_PREFIX),
-        process: ({ name, value }, { temp, args, mathTemp, tempVar, stepResults }) => {
-          const targetName = name.slice(CALL_PREFIX.length);
+    // Resolve all @ tokens and bare string literals to a JS-evaluable expression
+    const JS_LITERALS = new Set([
+      "null", "true", "false", "undefined", "NaN", "Infinity",
+    ]);
+    const resolveConditionStr = (condition: string): string => {
+      // Step 1 — replace @tokens with their JS-safe values
+      let result = condition.replace(/@\w+(?:\([^)]*\))?/g, (token) => {
+        const val = uniqueIdentifier(
+          [token],
+          args,
+          temp,
+          mathTemp,
+          tempVar,
+          stepResults,
+        )[0];
+        if (val === null || val === undefined) return "null";
+        if (typeof val === "string") return JSON.stringify(val);
+        return String(val);
+      });
+      // Step 2 — quote remaining bareword string literals so they don't throw
+      // ReferenceError (e.g. `@this == esther` → `"value" == "esther"`)
+      result = result.replace(
+        /("(?:[^"\\]|\\.)*")|('(?:[^'\\]|\\.)*')|(\b[a-zA-Z_$][a-zA-Z0-9_$]*\b)/g,
+        (match, dq, sq, bareword) => {
+          if (dq || sq) return match; // already quoted
+          if (JS_LITERALS.has(bareword)) return match; // JS keyword
+          return JSON.stringify(bareword);
+        },
+      );
+      return result;
+    };
+
+    const evalCondition = (condition: string): boolean => {
+      try {
+        const resolved = resolveConditionStr(condition);
+        // eslint-disable-next-line no-new-func
+        return Boolean(new Function("return (" + resolved + ")")());
+      } catch {
+        return false;
+      }
+    };
+
+    // Returns { earlyReturn: true, value } when a "return" action is hit,
+    // otherwise { earlyReturn: false } after all actions are processed.
+    const processActionList = (
+      actionList: FunctionActionInterface[],
+    ): { earlyReturn: boolean; value?: any } => {
+      for (const action of actionList) {
+        // "when" — conditional block: run sub-actions only if condition is true
+        if (action.name === "when") {
+          const condExpr = Array.isArray(action.value)
+            ? (action.value[0] ?? "")
+            : "";
+          if (condExpr && evalCondition(condExpr)) {
+            const sub = processActionList(action.subActions ?? []);
+            if (sub.earlyReturn) return sub;
+          }
+          stepResults.push(temp);
+          continue;
+        }
+
+        // "return" — early-exit with a specific value
+        if (action.name === "return") {
+          const parsed = uniqueIdentifier(
+            action.value,
+            args,
+            temp,
+            mathTemp,
+            tempVar,
+            stepResults,
+          );
+          return { earlyReturn: true, value: parsed[0] };
+        }
+
+        // "use" — switch current working value
+        if (action.name === "use") {
+          const parsed = uniqueIdentifier(
+            action.value,
+            args,
+            temp,
+            mathTemp,
+            tempVar,
+            stepResults,
+          );
+          temp = parsed[0];
+          stepResults.push(temp);
+          continue;
+        }
+
+        // "math" — evaluate a mathjs expression, store in mathTemp
+        if (action.name === "math") {
+          const parsed = uniqueIdentifier(
+            action.value,
+            args,
+            temp,
+            mathTemp,
+            tempVar,
+            stepResults,
+          );
+          mathTemp.push(evaluate(parsed.join(" ")));
+          stepResults.push(temp);
+          continue;
+        }
+
+        // "temp" — store a value in tempVar
+        if (action.name === "temp") {
+          const parsed = uniqueIdentifier(
+            action.value,
+            args,
+            temp,
+            mathTemp,
+            tempVar,
+            stepResults,
+          );
+          tempVar.push(parsed[0]);
+          stepResults.push(temp);
+          continue;
+        }
+
+        // cross-function call
+        if (action.name.startsWith(CALL_PREFIX)) {
+          const targetName = action.name.slice(CALL_PREFIX.length);
           const targetFunc = allFunctions?.find((f) => f.name === targetName);
           if (!targetFunc)
             throw new Error(`Function "${targetName}" not found`);
-          const parsedArgs = uniqueIdentifier(value, args, temp, mathTemp, tempVar, stepResults);
-          return fnRunner(deepClone(temp), parsedArgs, targetFunc.actions, allFunctions);
-        },
-      },
-      // Function call handler
-      {
-        condition: (action, temp) => {
-          if (["math", "temp", "return", "use"].includes(action.name))
-            return false;
-          if (action.name.startsWith(CALL_PREFIX)) return false;
-          if (temp == null) return false;
+          const parsedArgs = uniqueIdentifier(
+            action.value,
+            args,
+            temp,
+            mathTemp,
+            tempVar,
+            stepResults,
+          );
+          temp = fnRunner(
+            deepClone(temp),
+            parsedArgs,
+            targetFunc.actions,
+            allFunctions,
+          );
+          stepResults.push(temp);
+          continue;
+        }
 
+        // native method call or property access
+        if (temp != null) {
           const wrapped = wrapPrimitive(temp);
-          return typeof wrapped[action.name] === "function";
-        },
-        process: (
-          { name, value },
-          { temp, args, mathTemp, tempVar, stepResults },
-        ) => {
-          const parsedValue = uniqueIdentifier(
-            value,
-            args,
-            temp,
-            mathTemp,
-            tempVar,
-            stepResults,
-          );
-
-          const wrapped = wrapPrimitive(temp);
-          const result = wrapped[name](...parsedValue);
-          const unwrapped = unwrapPrimitive(result);
-          return unwrapped;
-        },
-      },
-      // Math calculation handler
-      {
-        condition: ({ name }) => name === "math",
-        process: (
-          { value },
-          { temp, args, mathTemp, tempVar, stepResults },
-        ) => {
-          const parsedValue = uniqueIdentifier(
-            value,
-            args,
-            temp,
-            mathTemp,
-            tempVar,
-            stepResults,
-          );
-          const expression = parsedValue.join(" ");
-          const calculatedValue = evaluate(expression);
-          mathTemp.push(calculatedValue);
-          return temp;
-        },
-      },
-      // Temp variable handler
-      {
-        condition: ({ name }) => name === "temp",
-        process: (
-          { value },
-          { temp, args, mathTemp, tempVar, stepResults },
-        ) => {
-          const parsedValue = uniqueIdentifier(
-            value,
-            args,
-            temp,
-            mathTemp,
-            tempVar,
-            stepResults,
-          );
-          tempVar.push(parsedValue[0]);
-          return temp;
-        },
-      },
-      // Return handler
-      {
-        condition: ({ name }) => name === "return",
-        process: (
-          { value },
-          { temp, args, mathTemp, tempVar, stepResults },
-        ) => {
-          const parsedValue = uniqueIdentifier(
-            value,
-            args,
-            temp,
-            mathTemp,
-            tempVar,
-            stepResults,
-          );
-          return parsedValue[0];
-        },
-      },
-      {
-        condition: ({ name }) => name === "use",
-        process: (
-          { value },
-          { temp, args, mathTemp, tempVar, stepResults },
-        ) => {
-          const parsedValue = uniqueIdentifier(
-            value,
-            args,
-            temp,
-            mathTemp,
-            tempVar,
-            stepResults,
-          );
-          return parsedValue[0];
-        },
-      },
-      // Property access handler (default)
-      {
-        condition: ({ name }) => !name.startsWith(CALL_PREFIX),
-        process: ({ name }, { temp }) => {
-          if (temp == null) return undefined;
-
-          const wrapped = wrapPrimitive(temp);
-          const result = wrapped[name];
-          return unwrapPrimitive(result);
-        },
-      },
-    ];
-
-    // Process each action with the appropriate handler
-    for (const action of actions) {
-      const context = { temp, args, mathTemp, tempVar, stepResults };
-      const handler = actionHandlers.find((h) => h.condition(action, temp));
-
-      if (handler) {
-        temp = handler.process(action, context);
-        stepResults.push(temp);
+          if (typeof wrapped[action.name] === "function") {
+            const parsed = uniqueIdentifier(
+              action.value,
+              args,
+              temp,
+              mathTemp,
+              tempVar,
+              stepResults,
+            );
+            temp = unwrapPrimitive(wrapped[action.name](...parsed));
+          } else {
+            temp = unwrapPrimitive(wrapped[action.name]);
+          }
+          stepResults.push(temp);
+        }
       }
-    }
+      return { earlyReturn: false };
+    };
 
-    return temp;
+    const result = processActionList(actions);
+    return result.earlyReturn ? result.value : temp;
   } catch (error: unknown) {
-    // Improved error handling with proper type checking
     if (error instanceof Error) {
       throw new Error(`Function execution error: ${error.message}`);
     }

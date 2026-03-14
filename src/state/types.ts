@@ -10,6 +10,7 @@ export interface FunctionActionInterface {
   name: string;
   dataType: string;
   value: any;
+  subActions?: FunctionActionInterface[]; // for "when" conditional blocks
 }
 
 export interface FunctionInterface {

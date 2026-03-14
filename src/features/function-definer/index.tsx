@@ -28,7 +28,11 @@ import {
   removeFunctionAction,
   updateFunctionAction,
   reorderFunctionActions,
+  addWhenSubAction,
+  removeWhenSubAction,
+  updateWhenSubAction,
 } from "@/state/slices/editorSlice";
+import { FunctionActionInterface } from "@/state/types";
 import {
   IconCheck,
   IconChevronDown,
@@ -252,6 +256,14 @@ const METHOD_DESCRIPTIONS: Record<string, { desc: string; params: string[] }> =
       desc: "Replaces the current working value with a token (@arg1, @temp1, …). All actions after this chain off the new value.",
       params: ["reference"],
     },
+    if: {
+      desc: "Evaluates one or more JS conditions (===, !==, <, >, etc.). Result is boolean stored as @if1, @if2, …",
+      params: ["condition"],
+    },
+    when: {
+      desc: "Runs sub-actions only when the condition is true. No value is stored — pure control flow.",
+      params: ["condition"],
+    },
   };
 
 // ─── @ token helpers ──────────────────────────────────────────────────────────
@@ -274,6 +286,7 @@ function buildAtTokens(
   tempCount: number,
   mathCount: number,
   pickCount: number,
+  ifCount: number = 0,
 ) {
   const tokens = [...AT_TOKEN_BASE];
   for (let i = 1; i <= tempCount; i++)
@@ -282,6 +295,8 @@ function buildAtTokens(
     tokens.push({ token: `@math${i}`, desc: `math result #${i}` });
   for (let i = 1; i <= pickCount; i++)
     tokens.push({ token: `@pick(${i})`, desc: `step result #${i}` });
+  for (let i = 1; i <= ifCount; i++)
+    tokens.push({ token: `@if${i}`, desc: `condition result #${i}` });
   return tokens;
 }
 
@@ -391,6 +406,79 @@ const MATH_EXAMPLES: {
   },
 ];
 
+// ─── If condition helpers ─────────────────────────────────────────────────────
+
+const IF_OPERATORS = [
+  { value: "===", label: "===" },
+  { value: "!==", label: "!==" },
+  { value: "==", label: "==" },
+  { value: "!=", label: "!=" },
+  { value: ">=", label: ">=" },
+  { value: "<=", label: "<=" },
+  { value: ">", label: ">" },
+  { value: "<", label: "<" },
+] as const;
+
+type IfOp = (typeof IF_OPERATORS)[number]["value"];
+
+type ConditionRow = {
+  id: string;
+  left: string;
+  op: IfOp;
+  right: string;
+  connector: "&&" | "||";
+};
+
+function parseConditionExpr(expr: string): ConditionRow[] {
+  const makeRow = (
+    left = "@this",
+    op: IfOp = "===",
+    right = "",
+    connector: "&&" | "||" = "&&",
+  ): ConditionRow => ({
+    id: Math.random().toString(36).slice(2),
+    left,
+    op,
+    right,
+    connector,
+  });
+
+  if (!expr.trim()) return [makeRow()];
+
+  const chunks: string[] = [];
+  const connectors: ("&&" | "||")[] = [];
+  const splitRe = /\s+(&&|\|\|)\s+/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = splitRe.exec(expr)) !== null) {
+    chunks.push(expr.slice(last, m.index).trim());
+    connectors.push(m[1] as "&&" | "||");
+    last = m.index + m[0].length;
+  }
+  chunks.push(expr.slice(last).trim());
+
+  return chunks.map((chunk, i) => {
+    const opMatch = chunk.match(/^(.*?)\s*(===|!==|>=|<=|>|<|==|!=)\s*(.*)$/);
+    if (opMatch)
+      return makeRow(
+        opMatch[1].trim(),
+        opMatch[2] as IfOp,
+        opMatch[3].trim(),
+        connectors[i] ?? "&&",
+      );
+    return makeRow(chunk, "===", "", connectors[i] ?? "&&");
+  });
+}
+
+function serializeConditionRows(rows: ConditionRow[]): string {
+  const parts: string[] = [];
+  rows.forEach((row, i) => {
+    parts.push(`${row.left} ${row.op} ${row.right}`);
+    if (i < rows.length - 1) parts.push(row.connector);
+  });
+  return parts.join(" ");
+}
+
 // ─── Method selector ──────────────────────────────────────────────────────────
 
 const MAGIC_NAMES = ["math", "temp", "return", "use"] as const;
@@ -420,6 +508,18 @@ const MAGIC_INDICATORS: Record<
     badge: "border-sky-200 bg-sky-50 text-sky-700",
     label: "switch",
   },
+};
+
+const IF_INDICATOR = {
+  dot: "bg-rose-400",
+  badge: "border-rose-200 bg-rose-50 text-rose-700",
+  label: "condition",
+};
+
+const WHEN_INDICATOR = {
+  dot: "bg-violet-400",
+  badge: "border-violet-200 bg-violet-50 text-violet-700",
+  label: "when",
 };
 
 const CALL_PREFIX = "call:";
@@ -558,6 +658,8 @@ const MethodSelector = ({
     : null;
   const isCallSelected = value.startsWith(CALL_PREFIX);
   const callTarget = isCallSelected ? value.slice(CALL_PREFIX.length) : null;
+  const isIfSelected = value === "if";
+  const isWhenSelected = value === "when";
   const selectedFn = funcList.find((fn) => fn.name === value);
 
   return (
@@ -571,7 +673,11 @@ const MethodSelector = ({
             ? magicInfo.badge
             : isCallSelected
               ? CALL_INDICATOR.badge
-              : "border-input bg-background text-foreground hover:bg-accent",
+              : isIfSelected
+                ? IF_INDICATOR.badge
+                : isWhenSelected
+                  ? WHEN_INDICATOR.badge
+                  : "border-input bg-background text-foreground hover:bg-accent",
         )}
       >
         {isMagicSelected && magicInfo && (
@@ -585,6 +691,16 @@ const MethodSelector = ({
               "w-1.5 h-1.5 rounded-full shrink-0",
               CALL_INDICATOR.dot,
             )}
+          />
+        )}
+        {isIfSelected && (
+          <span
+            className={cn("w-1.5 h-1.5 rounded-full shrink-0", IF_INDICATOR.dot)}
+          />
+        )}
+        {isWhenSelected && (
+          <span
+            className={cn("w-1.5 h-1.5 rounded-full shrink-0", WHEN_INDICATOR.dot)}
           />
         )}
         <span className="flex-1 text-left font-mono text-xs truncate">
@@ -856,6 +972,529 @@ const SuggestionPanel = ({
   );
 };
 
+// ─── IfConditionBuilder ───────────────────────────────────────────────────────
+
+const IfConditionBuilder = ({
+  value,
+  atTokens,
+  onChange,
+}: {
+  value: string;
+  atTokens: { token: string; desc: string }[];
+  onChange: (expr: string) => void;
+}) => {
+  const [rows, setRows] = React.useState<ConditionRow[]>(() =>
+    parseConditionExpr(value),
+  );
+  const prevValueRef = React.useRef(value);
+  React.useEffect(() => {
+    if (value !== prevValueRef.current) {
+      prevValueRef.current = value;
+      setRows(parseConditionExpr(value));
+    }
+  }, [value]);
+
+  const inputRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
+  const [lastFocused, setLastFocused] = React.useState<{
+    rowId: string;
+    field: "left" | "right";
+  } | null>(null);
+
+  const updateRows = (newRows: ConditionRow[]) => {
+    const serialized = serializeConditionRows(newRows);
+    prevValueRef.current = serialized;
+    setRows(newRows);
+    onChange(serialized);
+  };
+
+  const updateRow = (id: string, patch: Partial<ConditionRow>) =>
+    updateRows(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+
+  const addRow = () =>
+    updateRows([
+      ...rows,
+      {
+        id: Math.random().toString(36).slice(2),
+        left: "",
+        op: "===",
+        right: "",
+        connector: "&&",
+      },
+    ]);
+
+  const removeRow = (id: string) => {
+    if (rows.length === 1) return;
+    updateRows(rows.filter((r) => r.id !== id));
+  };
+
+  const insertToken = (token: string) => {
+    if (!lastFocused) return;
+    const key = `${lastFocused.rowId}-${lastFocused.field}`;
+    const input = inputRefs.current[key];
+    if (!input) return;
+    const val = input.value;
+    const cursor = input.selectionStart ?? val.length;
+    const newVal = val.slice(0, cursor) + token + val.slice(cursor);
+    updateRow(lastFocused.rowId, { [lastFocused.field]: newVal });
+    setTimeout(() => {
+      input.focus();
+      const pos = cursor + token.length;
+      input.setSelectionRange(pos, pos);
+    }, 0);
+  };
+
+  const inputClass =
+    "flex-1 min-w-0 h-7 text-xs rounded border border-input bg-background px-2 focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono placeholder:text-muted-foreground placeholder:font-sans";
+
+  return (
+    <div className="space-y-1 mt-1">
+      {rows.map((row, i) => (
+        <React.Fragment key={row.id}>
+          <div className="flex items-center gap-1">
+            <input
+              ref={(el) => {
+                inputRefs.current[`${row.id}-left`] = el;
+              }}
+              type="text"
+              value={row.left}
+              placeholder="@this"
+              onChange={(e) => updateRow(row.id, { left: e.target.value })}
+              onFocus={() => setLastFocused({ rowId: row.id, field: "left" })}
+              className={inputClass}
+            />
+            <Select
+              value={row.op}
+              onValueChange={(v) => updateRow(row.id, { op: v as IfOp })}
+            >
+              <SelectTrigger className="w-[66px] h-7 text-xs font-mono shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {IF_OPERATORS.map((op) => (
+                  <SelectItem
+                    key={op.value}
+                    value={op.value}
+                    className="font-mono text-xs"
+                  >
+                    {op.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <input
+              ref={(el) => {
+                inputRefs.current[`${row.id}-right`] = el;
+              }}
+              type="text"
+              value={row.right}
+              placeholder="value"
+              onChange={(e) => updateRow(row.id, { right: e.target.value })}
+              onFocus={() => setLastFocused({ rowId: row.id, field: "right" })}
+              className={inputClass}
+            />
+            <button
+              type="button"
+              onClick={() => removeRow(row.id)}
+              disabled={rows.length === 1}
+              className="h-7 w-7 shrink-0 flex items-center justify-center rounded text-muted-foreground hover:bg-red-50 hover:text-red-500 disabled:opacity-30 disabled:pointer-events-none"
+            >
+              <IconTrash size={11} />
+            </button>
+          </div>
+
+          {i < rows.length - 1 && (
+            <div className="flex items-center pl-1">
+              <button
+                type="button"
+                onClick={() =>
+                  updateRow(row.id, {
+                    connector: row.connector === "&&" ? "||" : "&&",
+                  })
+                }
+                className={cn(
+                  "text-[10px] font-mono font-bold px-2 py-0.5 rounded border transition-colors",
+                  row.connector === "&&"
+                    ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    : "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100",
+                )}
+              >
+                {row.connector}
+              </button>
+            </div>
+          )}
+        </React.Fragment>
+      ))}
+
+      <button
+        type="button"
+        onClick={addRow}
+        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground px-1 py-0.5 rounded hover:bg-accent"
+      >
+        <IconCircleDashedPlus size={11} />
+        add condition
+      </button>
+
+      {atTokens.filter((t) => !["@t", "@s", "@c", "@e"].includes(t.token))
+        .length > 0 && (
+        <div className="pt-1 border-t border-slate-200">
+          <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide mb-1">
+            @ tokens — click to insert
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {atTokens
+              .filter((t) => !["@t", "@s", "@c", "@e"].includes(t.token))
+              .map((t) => (
+                <button
+                  key={t.token}
+                  type="button"
+                  title={t.desc}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    insertToken(t.token);
+                  }}
+                  className="font-mono text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700 transition-colors"
+                >
+                  {t.token}
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── WhenSubActionRow ─────────────────────────────────────────────────────────
+
+const WhenSubActionRow = ({
+  functionId,
+  whenActionId,
+  subActionId,
+  subActionIndex,
+  outerPrecedingActions,
+}: {
+  functionId: string;
+  whenActionId: string;
+  subActionId: string;
+  subActionIndex: number;
+  outerPrecedingActions: FunctionActionInterface[];
+}) => {
+  const dispatch = useAppDispatch();
+  const dataTypes = useAppSelector((state) => state.editor.dataTypes);
+  const functions = useAppSelector((state) => state.editor.functions);
+  const [value, setValue] = React.useState("");
+  const [atQuery, setAtQuery] = React.useState<string | null>(null);
+  const [showExamples, setShowExamples] = React.useState(true);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const inputFocusedRef = React.useRef(false);
+
+  const whenAction = functions
+    .find((fn) => fn.id === functionId)
+    ?.actions.find((a) => a.id === whenActionId);
+
+  const subAction = whenAction?.subActions?.find((sa) => sa.id === subActionId);
+  const subActionName = (subAction?.name ?? "") as string;
+  const subActionDataType = (subAction?.dataType ?? "") as string;
+  const subActionValue = (subAction?.value?.join(",") ?? "") as string;
+
+  // Don't sync from Redux while the user is actively typing — it trims trailing
+  // spaces mid-keystroke and causes characters to be dropped.
+  React.useEffect(() => { if (!inputFocusedRef.current) setValue(subActionValue); }, [subActionValue]);
+  React.useEffect(() => { setShowExamples(true); }, [subActionName]);
+  React.useEffect(() => { if (value === "") setShowExamples(true); }, [value]);
+
+  const callableFunctions = useMemo(
+    () => functions.filter((fn) => fn.id !== functionId),
+    [functions, functionId],
+  );
+
+  const funcList = useMemo(() => {
+    let typedFunctions: readonly (readonly [string | number, string | number])[] = [];
+    switch (subActionDataType) {
+      case "string": typedFunctions = StringFunctions; break;
+      case "array": typedFunctions = ArrayFunctions; break;
+      case "number": typedFunctions = NumberFunctions; break;
+      case "boolean": typedFunctions = BooleanFunctions; break;
+      case "object": typedFunctions = ObjectFunctions; break;
+    }
+    const magic: { name: string | number; params: string | number }[] = [
+      { name: "math", params: "n" },
+      { name: "temp", params: 1 },
+      { name: "return", params: 1 },
+      { name: "use", params: 1 },
+    ];
+    const callEntries = callableFunctions.map((fn) => ({
+      name: `${CALL_PREFIX}${fn.name}`,
+      params: "n" as string | number,
+    }));
+    return [
+      ...magic,
+      ...callEntries,
+      ...typedFunctions.map((fn) => ({ name: fn[0], params: fn[1] })),
+    ];
+  }, [subActionDataType, callableFunctions]);
+
+  const paramsCount = useMemo(
+    () => funcList.find((fn) => fn.name === subActionName)?.params ?? 0,
+    [funcList, subActionName],
+  );
+
+  const innerPrecedingSubActions = useMemo(
+    () => whenAction?.subActions?.slice(0, subActionIndex) ?? [],
+    [whenAction, subActionIndex],
+  );
+
+  const atTokens = useMemo(() => {
+    const all = [...outerPrecedingActions, ...innerPrecedingSubActions];
+    return buildAtTokens(
+      all.filter((a) => a.name === "temp").length,
+      all.filter((a) => a.name === "math").length,
+      all.length,
+      all.filter((a) => a.name === "if").length,
+    );
+  }, [outerPrecedingActions, innerPrecedingSubActions]);
+
+  const dispatchUpdateImpl = ({
+    actionName,
+    actionDataType,
+    actionValue,
+  }: { actionName: string; actionDataType: string; actionValue: string }) => {
+    dispatch(
+      updateWhenSubAction({
+        functionId,
+        whenActionId,
+        subActionId,
+        subAction: {
+          id: subActionId,
+          name: actionName,
+          dataType: actionDataType,
+          value:
+            actionName === "if"
+              ? [actionValue]
+              : actionValue.split(",").map((v) => v.trim()),
+        },
+      }),
+    );
+  };
+  const dispatchUpdate = useDebounce(dispatchUpdateImpl, 300);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setValue(val);
+    const cursor = e.target.selectionStart ?? val.length;
+    const textBeforeCursor = val.slice(0, cursor);
+    const atMatch = textBeforeCursor.match(/@([\w()]*(?:\([^)]*)?)?$/);
+    setAtQuery(atMatch ? atMatch[1] : null);
+    dispatchUpdate({ actionName: subActionName, actionDataType: subActionDataType, actionValue: val });
+  };
+
+  const insertToken = (token: string) => {
+    const input = inputRef.current;
+    if (!input) return;
+    const val = input.value;
+    const cursor = input.selectionStart ?? val.length;
+    const textBeforeCursor = val.slice(0, cursor);
+    const atMatch = textBeforeCursor.match(/@([\w()]*(?:\([^)]*)?)?$/);
+    if (!atMatch) return;
+    const start = cursor - atMatch[0].length;
+    const newVal = val.slice(0, start) + token + val.slice(cursor);
+    setValue(newVal);
+    setAtQuery(null);
+    dispatchUpdate({ actionName: subActionName, actionDataType: subActionDataType, actionValue: newVal });
+    setTimeout(() => {
+      if (inputRef.current) {
+        const pos = start + token.length;
+        inputRef.current.focus();
+        inputRef.current.setSelectionRange(pos, pos);
+      }
+    }, 0);
+  };
+
+  return (
+    <div className="rounded border border-slate-200 p-1.5 space-y-1.5 bg-white">
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0 rounded">
+          {subActionIndex + 1}
+        </span>
+        <Button
+          variant="destructive"
+          size="icon"
+          onClick={() =>
+            dispatch(removeWhenSubAction({ functionId, whenActionId, subActionId }))
+          }
+          className="h-5 w-5 ml-auto"
+        >
+          <IconTrash size={11} />
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Select
+          value={subActionDataType}
+          onValueChange={(v) =>
+            dispatchUpdate({ actionName: subActionName, actionDataType: v, actionValue: subActionValue })
+          }
+        >
+          <SelectTrigger
+            className={cn("w-[90px] h-7 text-xs", !subActionDataType && "border-red-400")}
+          >
+            <SelectValue placeholder="type" />
+          </SelectTrigger>
+          <SelectContent>
+            {dataTypes.map((dt, i) => (
+              <SelectItem key={i} value={dt} className="text-xs">{dt}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <MethodSelector
+          value={subActionName}
+          funcList={funcList}
+          funcDataType={subActionDataType}
+          onChange={(v) =>
+            dispatchUpdate({ actionName: v, actionDataType: subActionDataType, actionValue: subActionValue })
+          }
+        />
+
+        {paramsCount !== 0 && subActionName !== "if" && (
+          <Input
+            ref={inputRef}
+            className="flex-1 min-w-[80px] h-7 text-xs"
+            placeholder={
+              paramsCount === "n"
+                ? "@arg1, @arg2"
+                : Array.from({ length: paramsCount as number })
+                    .map((_, i) => `@arg${i + 1}`)
+                    .join(", ")
+            }
+            value={value}
+            onChange={handleInputChange}
+            onFocus={() => { inputFocusedRef.current = true; }}
+            onBlur={() => {
+              inputFocusedRef.current = false;
+              setTimeout(() => setAtQuery(null), 150);
+            }}
+          />
+        )}
+      </div>
+
+      {subActionName === "if" && (
+        <IfConditionBuilder
+          value={value}
+          atTokens={atTokens}
+          onChange={(expr) => {
+            setValue(expr);
+            dispatchUpdate({ actionName: subActionName, actionDataType: subActionDataType, actionValue: expr });
+          }}
+        />
+      )}
+
+      {subActionName !== "if" && (
+        <SuggestionPanel
+          dataType={subActionDataType}
+          methodName={subActionName}
+          atQuery={atQuery}
+          atTokens={atTokens}
+          showExamples={showExamples}
+          inputValue={value}
+          onTokenSelect={insertToken}
+          onExampleSelect={(expr) => {
+            setValue(expr);
+            setAtQuery(null);
+            setShowExamples(false);
+            dispatchUpdate({ actionName: subActionName, actionDataType: subActionDataType, actionValue: expr });
+            setTimeout(() => inputRef.current?.focus(), 0);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// ─── WhenBlock ────────────────────────────────────────────────────────────────
+
+const WhenBlock = ({
+  functionId,
+  whenActionId,
+  conditionValue,
+  outerPrecedingActions,
+  onConditionChange,
+}: {
+  functionId: string;
+  whenActionId: string;
+  conditionValue: string;
+  outerPrecedingActions: FunctionActionInterface[];
+  onConditionChange: (expr: string) => void;
+}) => {
+  const dispatch = useAppDispatch();
+  const functions = useAppSelector((state) => state.editor.functions);
+
+  const subActions =
+    functions
+      .find((fn) => fn.id === functionId)
+      ?.actions.find((a) => a.id === whenActionId)?.subActions ?? [];
+
+  const atTokens = useMemo(() => {
+    return buildAtTokens(
+      outerPrecedingActions.filter((a) => a.name === "temp").length,
+      outerPrecedingActions.filter((a) => a.name === "math").length,
+      outerPrecedingActions.length,
+      outerPrecedingActions.filter((a) => a.name === "if").length,
+    );
+  }, [outerPrecedingActions]);
+
+  return (
+    <div className="mt-1 space-y-1">
+      <p className="text-[10px] text-violet-500 font-semibold uppercase tracking-wide">
+        Condition:
+      </p>
+      <IfConditionBuilder
+        value={conditionValue}
+        atTokens={atTokens}
+        onChange={onConditionChange}
+      />
+
+      <p className="text-[10px] text-violet-500 font-semibold uppercase tracking-wide pt-1">
+        Then:
+      </p>
+      <div className="ml-2 border-l-2 border-violet-200 pl-2 space-y-1">
+        {subActions.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-1.5 border border-dashed rounded">
+            No sub-actions yet.
+          </p>
+        ) : (
+          subActions.map((sa, idx) => (
+            <WhenSubActionRow
+              key={sa.id}
+              functionId={functionId}
+              whenActionId={whenActionId}
+              subActionId={sa.id}
+              subActionIndex={idx}
+              outerPrecedingActions={outerPrecedingActions}
+            />
+          ))
+        )}
+        <button
+          type="button"
+          onClick={() =>
+            dispatch(
+              addWhenSubAction({
+                functionId,
+                whenActionId,
+                subAction: { id: "", name: "", dataType: "", value: [] },
+              }),
+            )
+          }
+          className="flex items-center gap-1 text-[11px] text-violet-600 hover:text-violet-800 px-1 py-0.5 rounded hover:bg-violet-50"
+        >
+          <IconCircleDashedPlus size={11} />
+          add sub-action
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ─── FunctionActionInput ──────────────────────────────────────────────────────
 
 const FunctionActionInput = (payload: {
@@ -878,6 +1517,7 @@ const FunctionActionInput = (payload: {
   const [atQuery, setAtQuery] = React.useState<string | null>(null);
   const [showExamples, setShowExamples] = React.useState(true);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const inputFocusedRef = React.useRef(false);
 
   const funcName = React.useMemo(() => {
     return (functions
@@ -907,9 +1547,10 @@ const FunctionActionInput = (payload: {
       ?.value?.join(",") ?? "") as string;
   }, [functions, payload.functionId, payload.actionId]);
 
-  // Sync funcValue from Redux store to local state
+  // Don't sync from Redux while the user is actively typing — it trims trailing
+  // spaces mid-keystroke and causes characters to be dropped.
   React.useEffect(() => {
-    setValue(funcValue);
+    if (!inputFocusedRef.current) setValue(funcValue);
   }, [funcValue]);
 
   const callableFunctions = useMemo(
@@ -973,7 +1614,8 @@ const FunctionActionInput = (payload: {
     const tempCount = precedingActions.filter((a) => a.name === "temp").length;
     const mathCount = precedingActions.filter((a) => a.name === "math").length;
     const pickCount = precedingActions.length;
-    return buildAtTokens(tempCount, mathCount, pickCount);
+    const ifCount = precedingActions.filter((a) => a.name === "if").length;
+    return buildAtTokens(tempCount, mathCount, pickCount, ifCount);
   }, [precedingActions]);
 
   const handleRemove = () =>
@@ -1001,7 +1643,10 @@ const FunctionActionInput = (payload: {
           id: payload.actionId,
           name: actionName,
           dataType: actionDataType,
-          value: actionValue.split(",").map((v) => v.trim()),
+          value:
+            actionName === "if" || actionName === "when"
+              ? [actionValue]
+              : actionValue.split(",").map((v) => v.trim()),
         },
       }),
     );
@@ -1090,33 +1735,35 @@ const FunctionActionInput = (payload: {
 
       {/* Selectors row */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        <Select
-          defaultValue={payload.actionDataType}
-          value={funcDataType}
-          onValueChange={(v) =>
-            handleDatatype({
-              actionName: funcName,
-              actionDataType: v,
-              actionValue: funcValue,
-            })
-          }
-        >
-          <SelectTrigger
-            className={cn(
-              "w-[90px] h-7 text-xs",
-              !funcDataType && "border-red-400 focus:ring-red-200",
-            )}
+        {funcName !== "when" && (
+          <Select
+            defaultValue={payload.actionDataType}
+            value={funcDataType}
+            onValueChange={(v) =>
+              handleDatatype({
+                actionName: funcName,
+                actionDataType: v,
+                actionValue: funcValue,
+              })
+            }
           >
-            <SelectValue placeholder="type" />
-          </SelectTrigger>
-          <SelectContent>
-            {dataTypes.map((dt, i) => (
-              <SelectItem key={i} value={dt} className="text-xs">
-                {dt}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            <SelectTrigger
+              className={cn(
+                "w-[90px] h-7 text-xs",
+                !funcDataType && "border-red-400 focus:ring-red-200",
+              )}
+            >
+              <SelectValue placeholder="type" />
+            </SelectTrigger>
+            <SelectContent>
+              {dataTypes.map((dt, i) => (
+                <SelectItem key={i} value={dt} className="text-xs">
+                  {dt}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <MethodSelector
           value={funcName}
@@ -1131,7 +1778,7 @@ const FunctionActionInput = (payload: {
           }
         />
 
-        {paramsCount !== 0 && (
+        {paramsCount !== 0 && funcName !== "if" && funcName !== "when" && (
           <Input
             ref={inputRef}
             className={cn(
@@ -1147,32 +1794,72 @@ const FunctionActionInput = (payload: {
             }
             value={value}
             onChange={handleInputChange}
-            onBlur={() => setTimeout(() => setAtQuery(null), 150)}
+            onFocus={() => { inputFocusedRef.current = true; }}
+            onBlur={() => {
+              inputFocusedRef.current = false;
+              setTimeout(() => setAtQuery(null), 150);
+            }}
           />
         )}
       </div>
 
+      {/* If condition builder */}
+      {funcName === "if" && (
+        <IfConditionBuilder
+          value={value}
+          atTokens={atTokens}
+          onChange={(expr) => {
+            setValue(expr);
+            handleDatatype({
+              actionName: funcName,
+              actionDataType: funcDataType,
+              actionValue: expr,
+            });
+          }}
+        />
+      )}
+
+      {/* When block — condition + nested sub-actions */}
+      {funcName === "when" && (
+        <WhenBlock
+          functionId={payload.functionId}
+          whenActionId={payload.actionId}
+          conditionValue={value}
+          outerPrecedingActions={precedingActions}
+          onConditionChange={(expr) => {
+            setValue(expr);
+            handleDatatype({
+              actionName: "when",
+              actionDataType: "",
+              actionValue: expr,
+            });
+          }}
+        />
+      )}
+
       {/* Suggestion panel */}
-      <SuggestionPanel
-        dataType={funcDataType}
-        methodName={funcName}
-        atQuery={atQuery}
-        atTokens={atTokens}
-        showExamples={showExamples}
-        inputValue={value}
-        onTokenSelect={insertToken}
-        onExampleSelect={(expr) => {
-          setValue(expr);
-          setAtQuery(null);
-          setShowExamples(false);
-          handleDatatype({
-            actionName: funcName,
-            actionDataType: funcDataType,
-            actionValue: expr,
-          });
-          setTimeout(() => inputRef.current?.focus(), 0);
-        }}
-      />
+      {funcName !== "if" && funcName !== "when" && (
+        <SuggestionPanel
+          dataType={funcDataType}
+          methodName={funcName}
+          atQuery={atQuery}
+          atTokens={atTokens}
+          showExamples={showExamples}
+          inputValue={value}
+          onTokenSelect={insertToken}
+          onExampleSelect={(expr) => {
+            setValue(expr);
+            setAtQuery(null);
+            setShowExamples(false);
+            handleDatatype({
+              actionName: funcName,
+              actionDataType: funcDataType,
+              actionValue: expr,
+            });
+            setTimeout(() => inputRef.current?.focus(), 0);
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -1252,6 +1939,12 @@ const InstructionPanel = () => {
               <span>
                 <code className="bg-blue-100 px-1 rounded">use</code> — switch
                 context
+              </span>
+              <span>
+                <code className="bg-rose-100 px-1 rounded text-rose-700">if</code> — condition check
+              </span>
+              <span>
+                <code className="bg-violet-100 px-1 rounded text-violet-700">when</code> — conditional block
               </span>
             </div>
           </div>
@@ -1352,6 +2045,36 @@ const FunctionDefiner = () => {
               >
                 <IconCircleDashedPlus size={12} />
                 Add
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  dispatch(
+                    addFunctionAction({
+                      functionId: func.id,
+                      action: { id: "", name: "if", dataType: "", value: [] },
+                    }),
+                  )
+                }
+                className="h-6 text-xs gap-1 px-2 border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800"
+              >
+                <IconCircleDashedPlus size={12} />
+                Add if
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  dispatch(
+                    addFunctionAction({
+                      functionId: func.id,
+                      action: { id: "", name: "when", dataType: "", value: [] },
+                    }),
+                  )
+                }
+                className="h-6 text-xs gap-1 px-2 border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 hover:text-violet-800"
+              >
+                <IconCircleDashedPlus size={12} />
+                Add when
               </Button>
               <Button
                 onClick={() => toggleDetail(func.id)}

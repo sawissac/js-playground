@@ -229,6 +229,108 @@ export const editorSlice = createSlice({
       );
     },
 
+    addWhenSubAction: (
+      state,
+      action: PayloadAction<{
+        functionId: string;
+        whenActionId: string;
+        subAction: FunctionActionInterface;
+      }>,
+    ) => {
+      const func = state.functions.find(
+        (f) => f.id === action.payload.functionId,
+      );
+      if (func) {
+        const whenAct = func.actions.find(
+          (a) => a.id === action.payload.whenActionId,
+        );
+        if (whenAct) {
+          if (!whenAct.subActions) whenAct.subActions = [];
+          whenAct.subActions.push({
+            ...action.payload.subAction,
+            id: uuidv4(),
+          });
+        }
+      }
+    },
+
+    removeWhenSubAction: (
+      state,
+      action: PayloadAction<{
+        functionId: string;
+        whenActionId: string;
+        subActionId: string;
+      }>,
+    ) => {
+      const func = state.functions.find(
+        (f) => f.id === action.payload.functionId,
+      );
+      if (func) {
+        const whenAct = func.actions.find(
+          (a) => a.id === action.payload.whenActionId,
+        );
+        if (whenAct?.subActions) {
+          whenAct.subActions = whenAct.subActions.filter(
+            (sa) => sa.id !== action.payload.subActionId,
+          );
+        }
+      }
+    },
+
+    updateWhenSubAction: (
+      state,
+      action: PayloadAction<{
+        functionId: string;
+        whenActionId: string;
+        subActionId: string;
+        subAction: FunctionActionInterface;
+      }>,
+    ) => {
+      const func = state.functions.find(
+        (f) => f.id === action.payload.functionId,
+      );
+      if (func) {
+        const whenAct = func.actions.find(
+          (a) => a.id === action.payload.whenActionId,
+        );
+        if (whenAct?.subActions) {
+          const idx = whenAct.subActions.findIndex(
+            (sa) => sa.id === action.payload.subActionId,
+          );
+          if (idx !== -1) {
+            whenAct.subActions[idx] = {
+              ...action.payload.subAction,
+              id: action.payload.subActionId,
+            };
+          }
+        }
+      }
+    },
+
+    reorderWhenSubActions: (
+      state,
+      action: PayloadAction<{
+        functionId: string;
+        whenActionId: string;
+        fromIndex: number;
+        toIndex: number;
+      }>,
+    ) => {
+      const func = state.functions.find(
+        (f) => f.id === action.payload.functionId,
+      );
+      if (func) {
+        const whenAct = func.actions.find(
+          (a) => a.id === action.payload.whenActionId,
+        );
+        if (whenAct?.subActions) {
+          const { fromIndex, toIndex } = action.payload;
+          const [moved] = whenAct.subActions.splice(fromIndex, 1);
+          whenAct.subActions.splice(toIndex, 0, moved);
+        }
+      }
+    },
+
     reorderFunctionActions: (
       state,
       action: PayloadAction<{
@@ -273,6 +375,10 @@ export const {
   addFunctionAction,
   updateFunctionAction,
   removeFunctionAction,
+  addWhenSubAction,
+  removeWhenSubAction,
+  updateWhenSubAction,
+  reorderWhenSubActions,
   reorderFunctionActions,
   createSetRunner,
   createCallRunner,
