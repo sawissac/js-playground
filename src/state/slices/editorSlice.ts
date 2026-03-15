@@ -331,6 +331,105 @@ export const editorSlice = createSlice({
       }
     },
 
+    addLoopSubAction: (
+      state,
+      action: PayloadAction<{
+        functionId: string;
+        loopActionId: string;
+        subAction: FunctionActionInterface;
+      }>,
+    ) => {
+      const func = state.functions.find(
+        (f) => f.id === action.payload.functionId,
+      );
+      if (func) {
+        const loopAct = func.actions.find(
+          (a) => a.id === action.payload.loopActionId,
+        );
+        if (loopAct) {
+          if (!loopAct.subActions) loopAct.subActions = [];
+          loopAct.subActions.push({
+            ...action.payload.subAction,
+            id: uuidv4(),
+          });
+        }
+      }
+    },
+
+    removeLoopSubAction: (
+      state,
+      action: PayloadAction<{
+        functionId: string;
+        loopActionId: string;
+        subActionId: string;
+      }>,
+    ) => {
+      const func = state.functions.find(
+        (f) => f.id === action.payload.functionId,
+      );
+      if (func) {
+        const loopAct = func.actions.find(
+          (a) => a.id === action.payload.loopActionId,
+        );
+        if (loopAct?.subActions) {
+          loopAct.subActions = loopAct.subActions.filter(
+            (sa) => sa.id !== action.payload.subActionId,
+          );
+        }
+      }
+    },
+
+    updateLoopSubAction: (
+      state,
+      action: PayloadAction<{
+        functionId: string;
+        loopActionId: string;
+        subActionId: string;
+        subAction: FunctionActionInterface;
+      }>,
+    ) => {
+      const func = state.functions.find(
+        (f) => f.id === action.payload.functionId,
+      );
+      if (func) {
+        const loopAct = func.actions.find(
+          (a) => a.id === action.payload.loopActionId,
+        );
+        if (loopAct?.subActions) {
+          const idx = loopAct.subActions.findIndex(
+            (sa) => sa.id === action.payload.subActionId,
+          );
+          if (idx !== -1) {
+            loopAct.subActions[idx] = {
+              ...action.payload.subAction,
+              id: action.payload.subActionId,
+            };
+          }
+        }
+      }
+    },
+
+    updateLoopParams: (
+      state,
+      action: PayloadAction<{
+        functionId: string;
+        loopActionId: string;
+        loopParams: { start?: string; end?: string; step?: string };
+      }>,
+    ) => {
+      const func = state.functions.find(
+        (f) => f.id === action.payload.functionId,
+      );
+      if (func) {
+        const loopAct = func.actions.find(
+          (a) => a.id === action.payload.loopActionId,
+        );
+        if (loopAct) {
+          loopAct.loopParams = action.payload.loopParams;
+        }
+      }
+    },
+
     reorderFunctionActions: (
       state,
       action: PayloadAction<{
@@ -379,6 +478,10 @@ export const {
   removeWhenSubAction,
   updateWhenSubAction,
   reorderWhenSubActions,
+  addLoopSubAction,
+  removeLoopSubAction,
+  updateLoopSubAction,
+  updateLoopParams,
   reorderFunctionActions,
   createSetRunner,
   createCallRunner,

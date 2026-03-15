@@ -31,6 +31,10 @@ import {
   addWhenSubAction,
   removeWhenSubAction,
   updateWhenSubAction,
+  addLoopSubAction,
+  removeLoopSubAction,
+  updateLoopSubAction,
+  updateLoopParams,
 } from "@/state/slices/editorSlice";
 import { FunctionActionInterface } from "@/state/types";
 import {
@@ -264,6 +268,10 @@ const METHOD_DESCRIPTIONS: Record<string, { desc: string; params: string[] }> =
       desc: "Runs sub-actions only when the condition is true. No value is stored — pure control flow.",
       params: ["condition"],
     },
+    loop: {
+      desc: "Iterates from start to end by step, running process actions on each iteration. Sub-actions start with the full current value (@this = whole array/value). Use 'use @this' as the first sub-action to switch context to the current element — after that, all chained actions operate on that element. Without 'use @this', methods like join or reverse run on the whole collection each iteration. Returns an array collecting the final result of each iteration.",
+      params: ["start", "end", "step"],
+    },
   };
 
 // ─── @ token helpers ──────────────────────────────────────────────────────────
@@ -287,8 +295,14 @@ function buildAtTokens(
   mathCount: number,
   pickCount: number,
   ifCount: number = 0,
+  options?: { loopContext?: boolean },
 ) {
   const tokens = [...AT_TOKEN_BASE];
+  if (options?.loopContext) {
+    // Inside a loop, @this in a "use" sub-action resolves to the current element.
+    // Add hints so the user knows about this pattern.
+    tokens.push({ token: "@this", desc: "current element (inside use)" });
+  }
   for (let i = 1; i <= tempCount; i++)
     tokens.push({ token: `@temp${i}`, desc: `stored temp #${i}` });
   for (let i = 1; i <= mathCount; i++)
@@ -522,6 +536,12 @@ const WHEN_INDICATOR = {
   label: "when",
 };
 
+const LOOP_INDICATOR = {
+  dot: "bg-indigo-400",
+  badge: "border-indigo-200 bg-indigo-50 text-indigo-700",
+  label: "loop",
+};
+
 const CALL_PREFIX = "call:";
 const CALL_INDICATOR = {
   dot: "bg-emerald-400",
@@ -660,6 +680,7 @@ const MethodSelector = ({
   const callTarget = isCallSelected ? value.slice(CALL_PREFIX.length) : null;
   const isIfSelected = value === "if";
   const isWhenSelected = value === "when";
+  const isLoopSelected = value === "loop";
   const selectedFn = funcList.find((fn) => fn.name === value);
 
   return (
@@ -677,7 +698,9 @@ const MethodSelector = ({
                 ? IF_INDICATOR.badge
                 : isWhenSelected
                   ? WHEN_INDICATOR.badge
-                  : "border-input bg-background text-foreground hover:bg-accent",
+                  : isLoopSelected
+                    ? LOOP_INDICATOR.badge
+                    : "border-input bg-background text-foreground hover:bg-accent",
         )}
       >
         {isMagicSelected && magicInfo && (
@@ -695,12 +718,26 @@ const MethodSelector = ({
         )}
         {isIfSelected && (
           <span
-            className={cn("w-1.5 h-1.5 rounded-full shrink-0", IF_INDICATOR.dot)}
+            className={cn(
+              "w-1.5 h-1.5 rounded-full shrink-0",
+              IF_INDICATOR.dot,
+            )}
           />
         )}
         {isWhenSelected && (
           <span
-            className={cn("w-1.5 h-1.5 rounded-full shrink-0", WHEN_INDICATOR.dot)}
+            className={cn(
+              "w-1.5 h-1.5 rounded-full shrink-0",
+              WHEN_INDICATOR.dot,
+            )}
+          />
+        )}
+        {isLoopSelected && (
+          <span
+            className={cn(
+              "w-1.5 h-1.5 rounded-full shrink-0",
+              LOOP_INDICATOR.dot,
+            )}
           />
         )}
         <span className="flex-1 text-left font-mono text-xs truncate">
@@ -916,31 +953,33 @@ const SuggestionPanel = ({
       )}
 
       {/* Quick-insert for return / use — show when no @-query is active and input is empty */}
-      {(methodName === "return" || methodName === "use") && !hasTokens && !inputValue && (
-        <div className="space-y-1">
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
-            quick insert
-          </p>
-          <div className="flex flex-wrap gap-1">
-            {atTokens
-              .filter((t) => !["@t", "@s", "@c", "@e"].includes(t.token))
-              .map((t) => (
-                <button
-                  key={t.token}
-                  type="button"
-                  title={t.desc}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    onExampleSelect(t.token);
-                  }}
-                  className="font-mono text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5 hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition-colors"
-                >
-                  {t.token}
-                </button>
-              ))}
+      {(methodName === "return" || methodName === "use") &&
+        !hasTokens &&
+        !inputValue && (
+          <div className="space-y-1">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+              quick insert
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {atTokens
+                .filter((t) => !["@t", "@s", "@c", "@e"].includes(t.token))
+                .map((t) => (
+                  <button
+                    key={t.token}
+                    type="button"
+                    title={t.desc}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onExampleSelect(t.token);
+                    }}
+                    className="font-mono text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5 hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition-colors"
+                  >
+                    {t.token}
+                  </button>
+                ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* @ token suggestions */}
       {hasTokens && (
@@ -1199,9 +1238,15 @@ const WhenSubActionRow = ({
 
   // Don't sync from Redux while the user is actively typing — it trims trailing
   // spaces mid-keystroke and causes characters to be dropped.
-  React.useEffect(() => { if (!inputFocusedRef.current) setValue(subActionValue); }, [subActionValue]);
-  React.useEffect(() => { setShowExamples(true); }, [subActionName]);
-  React.useEffect(() => { if (value === "") setShowExamples(true); }, [value]);
+  React.useEffect(() => {
+    if (!inputFocusedRef.current) setValue(subActionValue);
+  }, [subActionValue]);
+  React.useEffect(() => {
+    setShowExamples(true);
+  }, [subActionName]);
+  React.useEffect(() => {
+    if (value === "") setShowExamples(true);
+  }, [value]);
 
   const callableFunctions = useMemo(
     () => functions.filter((fn) => fn.id !== functionId),
@@ -1209,13 +1254,26 @@ const WhenSubActionRow = ({
   );
 
   const funcList = useMemo(() => {
-    let typedFunctions: readonly (readonly [string | number, string | number])[] = [];
+    let typedFunctions: readonly (readonly [
+      string | number,
+      string | number,
+    ])[] = [];
     switch (subActionDataType) {
-      case "string": typedFunctions = StringFunctions; break;
-      case "array": typedFunctions = ArrayFunctions; break;
-      case "number": typedFunctions = NumberFunctions; break;
-      case "boolean": typedFunctions = BooleanFunctions; break;
-      case "object": typedFunctions = ObjectFunctions; break;
+      case "string":
+        typedFunctions = StringFunctions;
+        break;
+      case "array":
+        typedFunctions = ArrayFunctions;
+        break;
+      case "number":
+        typedFunctions = NumberFunctions;
+        break;
+      case "boolean":
+        typedFunctions = BooleanFunctions;
+        break;
+      case "object":
+        typedFunctions = ObjectFunctions;
+        break;
     }
     const magic: { name: string | number; params: string | number }[] = [
       { name: "math", params: "n" },
@@ -1258,7 +1316,11 @@ const WhenSubActionRow = ({
     actionName,
     actionDataType,
     actionValue,
-  }: { actionName: string; actionDataType: string; actionValue: string }) => {
+  }: {
+    actionName: string;
+    actionDataType: string;
+    actionValue: string;
+  }) => {
     dispatch(
       updateWhenSubAction({
         functionId,
@@ -1285,7 +1347,11 @@ const WhenSubActionRow = ({
     const textBeforeCursor = val.slice(0, cursor);
     const atMatch = textBeforeCursor.match(/@([\w()]*(?:\([^)]*)?)?$/);
     setAtQuery(atMatch ? atMatch[1] : null);
-    dispatchUpdate({ actionName: subActionName, actionDataType: subActionDataType, actionValue: val });
+    dispatchUpdate({
+      actionName: subActionName,
+      actionDataType: subActionDataType,
+      actionValue: val,
+    });
   };
 
   const insertToken = (token: string) => {
@@ -1300,7 +1366,11 @@ const WhenSubActionRow = ({
     const newVal = val.slice(0, start) + token + val.slice(cursor);
     setValue(newVal);
     setAtQuery(null);
-    dispatchUpdate({ actionName: subActionName, actionDataType: subActionDataType, actionValue: newVal });
+    dispatchUpdate({
+      actionName: subActionName,
+      actionDataType: subActionDataType,
+      actionValue: newVal,
+    });
     setTimeout(() => {
       if (inputRef.current) {
         const pos = start + token.length;
@@ -1320,7 +1390,9 @@ const WhenSubActionRow = ({
           variant="destructive"
           size="icon"
           onClick={() =>
-            dispatch(removeWhenSubAction({ functionId, whenActionId, subActionId }))
+            dispatch(
+              removeWhenSubAction({ functionId, whenActionId, subActionId }),
+            )
           }
           className="h-5 w-5 ml-auto"
         >
@@ -1332,17 +1404,26 @@ const WhenSubActionRow = ({
         <Select
           value={subActionDataType}
           onValueChange={(v) =>
-            dispatchUpdate({ actionName: subActionName, actionDataType: v, actionValue: subActionValue })
+            dispatchUpdate({
+              actionName: subActionName,
+              actionDataType: v,
+              actionValue: subActionValue,
+            })
           }
         >
           <SelectTrigger
-            className={cn("w-[90px] h-7 text-xs", !subActionDataType && "border-red-400")}
+            className={cn(
+              "w-[90px] h-7 text-xs",
+              !subActionDataType && "border-red-400",
+            )}
           >
             <SelectValue placeholder="type" />
           </SelectTrigger>
           <SelectContent>
             {dataTypes.map((dt, i) => (
-              <SelectItem key={i} value={dt} className="text-xs">{dt}</SelectItem>
+              <SelectItem key={i} value={dt} className="text-xs">
+                {dt}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -1352,7 +1433,11 @@ const WhenSubActionRow = ({
           funcList={funcList}
           funcDataType={subActionDataType}
           onChange={(v) =>
-            dispatchUpdate({ actionName: v, actionDataType: subActionDataType, actionValue: subActionValue })
+            dispatchUpdate({
+              actionName: v,
+              actionDataType: subActionDataType,
+              actionValue: subActionValue,
+            })
           }
         />
 
@@ -1369,7 +1454,9 @@ const WhenSubActionRow = ({
             }
             value={value}
             onChange={handleInputChange}
-            onFocus={() => { inputFocusedRef.current = true; }}
+            onFocus={() => {
+              inputFocusedRef.current = true;
+            }}
             onBlur={() => {
               inputFocusedRef.current = false;
               setTimeout(() => setAtQuery(null), 150);
@@ -1384,7 +1471,11 @@ const WhenSubActionRow = ({
           atTokens={atTokens}
           onChange={(expr) => {
             setValue(expr);
-            dispatchUpdate({ actionName: subActionName, actionDataType: subActionDataType, actionValue: expr });
+            dispatchUpdate({
+              actionName: subActionName,
+              actionDataType: subActionDataType,
+              actionValue: expr,
+            });
           }}
         />
       )}
@@ -1402,11 +1493,492 @@ const WhenSubActionRow = ({
             setValue(expr);
             setAtQuery(null);
             setShowExamples(false);
-            dispatchUpdate({ actionName: subActionName, actionDataType: subActionDataType, actionValue: expr });
+            dispatchUpdate({
+              actionName: subActionName,
+              actionDataType: subActionDataType,
+              actionValue: expr,
+            });
             setTimeout(() => inputRef.current?.focus(), 0);
           }}
         />
       )}
+    </div>
+  );
+};
+
+// ─── LoopSubActionRow ─────────────────────────────────────────────────────────
+
+const LoopSubActionRow = ({
+  functionId,
+  loopActionId,
+  subActionId,
+  subActionIndex,
+  outerPrecedingActions,
+}: {
+  functionId: string;
+  loopActionId: string;
+  subActionId: string;
+  subActionIndex: number;
+  outerPrecedingActions: FunctionActionInterface[];
+}) => {
+  const dispatch = useAppDispatch();
+  const dataTypes = useAppSelector((state) => state.editor.dataTypes);
+  const functions = useAppSelector((state) => state.editor.functions);
+  const [value, setValue] = React.useState("");
+  const [atQuery, setAtQuery] = React.useState<string | null>(null);
+  const [showExamples, setShowExamples] = React.useState(true);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const inputFocusedRef = React.useRef(false);
+
+  const loopAction = functions
+    .find((fn) => fn.id === functionId)
+    ?.actions.find((a) => a.id === loopActionId);
+
+  const subAction = loopAction?.subActions?.find((sa) => sa.id === subActionId);
+  const subActionName = (subAction?.name ?? "") as string;
+  const subActionDataType = (subAction?.dataType ?? "") as string;
+  const subActionValue = (subAction?.value?.join(",") ?? "") as string;
+
+  React.useEffect(() => {
+    if (!inputFocusedRef.current) setValue(subActionValue);
+  }, [subActionValue]);
+  React.useEffect(() => {
+    setShowExamples(true);
+  }, [subActionName]);
+  React.useEffect(() => {
+    if (value === "") setShowExamples(true);
+  }, [value]);
+
+  const callableFunctions = useMemo(
+    () => functions.filter((fn) => fn.id !== functionId),
+    [functions, functionId],
+  );
+
+  const funcList = useMemo(() => {
+    let typedFunctions: readonly (readonly [
+      string | number,
+      string | number,
+    ])[] = [];
+    switch (subActionDataType) {
+      case "string":
+        typedFunctions = StringFunctions;
+        break;
+      case "array":
+        typedFunctions = ArrayFunctions;
+        break;
+      case "number":
+        typedFunctions = NumberFunctions;
+        break;
+      case "boolean":
+        typedFunctions = BooleanFunctions;
+        break;
+      case "object":
+        typedFunctions = ObjectFunctions;
+        break;
+    }
+    const magic: { name: string | number; params: string | number }[] = [
+      { name: "math", params: "n" },
+      { name: "temp", params: 1 },
+      { name: "return", params: 1 },
+      { name: "use", params: 1 },
+    ];
+    const callEntries = callableFunctions.map((fn) => ({
+      name: `${CALL_PREFIX}${fn.name}`,
+      params: "n" as string | number,
+    }));
+    return [
+      ...magic,
+      ...callEntries,
+      ...typedFunctions.map((fn) => ({ name: fn[0], params: fn[1] })),
+    ];
+  }, [subActionDataType, callableFunctions]);
+
+  const paramsCount = useMemo(
+    () => funcList.find((fn) => fn.name === subActionName)?.params ?? 0,
+    [funcList, subActionName],
+  );
+
+  const innerPrecedingSubActions = useMemo(
+    () => loopAction?.subActions?.slice(0, subActionIndex) ?? [],
+    [loopAction, subActionIndex],
+  );
+
+  const atTokens = useMemo(() => {
+    const all = [...outerPrecedingActions, ...innerPrecedingSubActions];
+    return buildAtTokens(
+      all.filter((a) => a.name === "temp").length,
+      all.filter((a) => a.name === "math").length,
+      all.length,
+      all.filter((a) => a.name === "if").length,
+      { loopContext: true },
+    );
+  }, [outerPrecedingActions, innerPrecedingSubActions]);
+
+  const dispatchUpdateImpl = ({
+    actionName,
+    actionDataType,
+    actionValue,
+  }: {
+    actionName: string;
+    actionDataType: string;
+    actionValue: string;
+  }) => {
+    dispatch(
+      updateLoopSubAction({
+        functionId,
+        loopActionId,
+        subActionId,
+        subAction: {
+          id: subActionId,
+          name: actionName,
+          dataType: actionDataType,
+          value:
+            actionName === "if"
+              ? [actionValue]
+              : actionValue.split(",").map((v) => v.trim()),
+        },
+      }),
+    );
+  };
+  const dispatchUpdate = useDebounce(dispatchUpdateImpl, 300);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setValue(val);
+    const cursor = e.target.selectionStart ?? val.length;
+    const textBeforeCursor = val.slice(0, cursor);
+    const atMatch = textBeforeCursor.match(/@([\w()]*(?:\([^)]*)?)?$/);
+    setAtQuery(atMatch ? atMatch[1] : null);
+    dispatchUpdate({
+      actionName: subActionName,
+      actionDataType: subActionDataType,
+      actionValue: val,
+    });
+  };
+
+  const insertToken = (token: string) => {
+    const input = inputRef.current;
+    if (!input) return;
+    const val = input.value;
+    const cursor = input.selectionStart ?? val.length;
+    const textBeforeCursor = val.slice(0, cursor);
+    const atMatch = textBeforeCursor.match(/@([\w()]*(?:\([^)]*)?)?$/);
+    if (!atMatch) return;
+    const start = cursor - atMatch[0].length;
+    const newVal = val.slice(0, start) + token + val.slice(cursor);
+    setValue(newVal);
+    setAtQuery(null);
+    dispatchUpdate({
+      actionName: subActionName,
+      actionDataType: subActionDataType,
+      actionValue: newVal,
+    });
+    setTimeout(() => {
+      if (inputRef.current) {
+        const pos = start + token.length;
+        inputRef.current.focus();
+        inputRef.current.setSelectionRange(pos, pos);
+      }
+    }, 0);
+  };
+
+  return (
+    <div className="rounded border border-slate-200 p-1.5 space-y-1.5 bg-white">
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs font-mono text-muted-foreground bg-muted px-1.5 py-0 rounded">
+          {subActionIndex + 1}
+        </span>
+        <Button
+          variant="destructive"
+          size="icon"
+          onClick={() =>
+            dispatch(
+              removeLoopSubAction({ functionId, loopActionId, subActionId }),
+            )
+          }
+          className="h-5 w-5 ml-auto"
+        >
+          <IconTrash size={11} />
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Select
+          value={subActionDataType}
+          onValueChange={(v) =>
+            dispatchUpdate({
+              actionName: subActionName,
+              actionDataType: v,
+              actionValue: subActionValue,
+            })
+          }
+        >
+          <SelectTrigger
+            className={cn(
+              "w-[90px] h-7 text-xs",
+              !subActionDataType && "border-red-400",
+            )}
+          >
+            <SelectValue placeholder="type" />
+          </SelectTrigger>
+          <SelectContent>
+            {dataTypes.map((dt, i) => (
+              <SelectItem key={i} value={dt} className="text-xs">
+                {dt}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <MethodSelector
+          value={subActionName}
+          funcList={funcList}
+          funcDataType={subActionDataType}
+          onChange={(v) =>
+            dispatchUpdate({
+              actionName: v,
+              actionDataType: subActionDataType,
+              actionValue: subActionValue,
+            })
+          }
+        />
+
+        {paramsCount !== 0 && subActionName !== "if" && (
+          <Input
+            ref={inputRef}
+            className="flex-1 min-w-[80px] h-7 text-xs"
+            placeholder={
+              paramsCount === "n"
+                ? "@arg1, @arg2"
+                : Array.from({ length: paramsCount as number })
+                    .map((_, i) => `@arg${i + 1}`)
+                    .join(", ")
+            }
+            value={value}
+            onChange={handleInputChange}
+            onFocus={() => {
+              inputFocusedRef.current = true;
+            }}
+            onBlur={() => {
+              inputFocusedRef.current = false;
+              setTimeout(() => setAtQuery(null), 150);
+            }}
+          />
+        )}
+      </div>
+
+      {subActionName === "if" && (
+        <IfConditionBuilder
+          value={value}
+          atTokens={atTokens}
+          onChange={(expr) => {
+            setValue(expr);
+            dispatchUpdate({
+              actionName: subActionName,
+              actionDataType: subActionDataType,
+              actionValue: expr,
+            });
+          }}
+        />
+      )}
+
+      {subActionName !== "if" && (
+        <SuggestionPanel
+          dataType={subActionDataType}
+          methodName={subActionName}
+          atQuery={atQuery}
+          atTokens={atTokens}
+          showExamples={showExamples}
+          inputValue={value}
+          onTokenSelect={insertToken}
+          onExampleSelect={(expr) => {
+            setValue(expr);
+            setAtQuery(null);
+            setShowExamples(false);
+            dispatchUpdate({
+              actionName: subActionName,
+              actionDataType: subActionDataType,
+              actionValue: expr,
+            });
+            setTimeout(() => inputRef.current?.focus(), 0);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// ─── LoopBlock ────────────────────────────────────────────────────────────────
+
+const LoopBlock = ({
+  functionId,
+  loopActionId,
+  outerPrecedingActions,
+}: {
+  functionId: string;
+  loopActionId: string;
+  outerPrecedingActions: FunctionActionInterface[];
+}) => {
+  const dispatch = useAppDispatch();
+  const functions = useAppSelector((state) => state.editor.functions);
+
+  const loopAction = functions
+    .find((fn) => fn.id === functionId)
+    ?.actions.find((a) => a.id === loopActionId);
+
+  const subActions = loopAction?.subActions ?? [];
+  const loopParams = loopAction?.loopParams ?? {
+    start: "0",
+    end: "@this.length",
+    step: "1",
+  };
+
+  const atTokens = useMemo(() => {
+    return buildAtTokens(
+      outerPrecedingActions.filter((a) => a.name === "temp").length,
+      outerPrecedingActions.filter((a) => a.name === "math").length,
+      outerPrecedingActions.length,
+      outerPrecedingActions.filter((a) => a.name === "if").length,
+    );
+  }, [outerPrecedingActions]);
+
+  const updateParams = useDebounce(
+    (params: { start?: string; end?: string; step?: string }) => {
+      dispatch(
+        updateLoopParams({ functionId, loopActionId, loopParams: params }),
+      );
+    },
+    300,
+  );
+
+  return (
+    <div className="mt-1 space-y-1">
+      <div className="rounded-md bg-indigo-50 border border-indigo-200 p-2 space-y-2">
+        <p className="text-[10px] text-indigo-700 font-semibold uppercase tracking-wide">
+          Loop Parameters
+        </p>
+        <p className="text-[11px] text-indigo-600 leading-relaxed">
+          Iterates from <strong>start</strong> to <strong>end</strong> by{" "}
+          <strong>step</strong>. Use positive step to count up, negative to
+          count down. Supports @ tokens like{" "}
+          <code className="bg-indigo-100 px-1 rounded text-[10px]">
+            @this.length
+          </code>
+          .
+        </p>
+        <div className="border-t border-indigo-200 pt-1.5 space-y-1.5">
+          <p className="text-[10px] text-indigo-700 font-semibold uppercase tracking-wide">
+            How sub-actions work
+          </p>
+          <div className="text-[11px] text-indigo-600 leading-relaxed space-y-1">
+            <p>
+              By default, each sub-action operates on the{" "}
+              <strong>full current value</strong> (the whole array or object).
+              Methods like{" "}
+              <code className="bg-indigo-100 px-1 rounded text-[10px]">
+                join
+              </code>
+              ,{" "}
+              <code className="bg-indigo-100 px-1 rounded text-[10px]">
+                reverse
+              </code>
+              , or{" "}
+              <code className="bg-indigo-100 px-1 rounded text-[10px]">
+                length
+              </code>{" "}
+              apply to the entire collection on each iteration.
+            </p>
+            <p>
+              To work with <strong>individual elements</strong>, add{" "}
+              <code className="bg-indigo-100 px-1 rounded text-[10px]">
+                use @this
+              </code>{" "}
+              as the first sub-action — it switches context to the current
+              element. All subsequent actions then chain off that element.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-1">
+            <div className="rounded bg-white border border-indigo-200 p-1.5">
+              <p className="text-[10px] text-indigo-500 font-semibold mb-0.5">
+                Whole collection (no use)
+              </p>
+              <p className="text-[10px] text-indigo-800 font-mono">
+                loop 0..3 → join @empty → ["abc","abc","abc"]
+              </p>
+            </div>
+            <div className="rounded bg-white border border-indigo-200 p-1.5">
+              <p className="text-[10px] text-indigo-500 font-semibold mb-0.5">
+                Per element (with use @this)
+              </p>
+              <p className="text-[10px] text-indigo-800 font-mono">
+                loop 0..3 → use @this → toUpperCase → ["A","B","C"]
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <Input
+          className="flex-1 min-w-[60px] h-7 text-xs"
+          placeholder="start (0)"
+          defaultValue={loopParams.start}
+          onChange={(e) =>
+            updateParams({ ...loopParams, start: e.target.value })
+          }
+        />
+        <Input
+          className="flex-1 min-w-[60px] h-7 text-xs"
+          placeholder="end (@this.length)"
+          defaultValue={loopParams.end}
+          onChange={(e) => updateParams({ ...loopParams, end: e.target.value })}
+        />
+        <Input
+          className="flex-1 min-w-[60px] h-7 text-xs"
+          placeholder="step (1)"
+          defaultValue={loopParams.step}
+          onChange={(e) =>
+            updateParams({ ...loopParams, step: e.target.value })
+          }
+        />
+      </div>
+
+      <p className="text-[10px] text-indigo-500 font-semibold uppercase tracking-wide pt-1">
+        Process (for each iteration):
+      </p>
+      <div className="ml-2 border-l-2 border-indigo-200 pl-2 space-y-1">
+        {subActions.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-1.5 border border-dashed rounded">
+            No process actions yet.
+          </p>
+        ) : (
+          subActions.map((sa, idx) => (
+            <LoopSubActionRow
+              key={sa.id}
+              functionId={functionId}
+              loopActionId={loopActionId}
+              subActionId={sa.id}
+              subActionIndex={idx}
+              outerPrecedingActions={outerPrecedingActions}
+            />
+          ))
+        )}
+        <button
+          type="button"
+          onClick={() =>
+            dispatch(
+              addLoopSubAction({
+                functionId,
+                loopActionId,
+                subAction: { id: "", name: "", dataType: "", value: [] },
+              }),
+            )
+          }
+          className="flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-800 px-1 py-0.5 rounded hover:bg-indigo-50"
+        >
+          <IconCircleDashedPlus size={11} />
+          add process action
+        </button>
+      </div>
     </div>
   );
 };
@@ -1644,7 +2216,9 @@ const FunctionActionInput = (payload: {
           name: actionName,
           dataType: actionDataType,
           value:
-            actionName === "if" || actionName === "when"
+            actionName === "if" ||
+            actionName === "when" ||
+            actionName === "loop"
               ? [actionValue]
               : actionValue.split(",").map((v) => v.trim()),
         },
@@ -1735,7 +2309,7 @@ const FunctionActionInput = (payload: {
 
       {/* Selectors row */}
       <div className="flex items-center gap-1.5 flex-wrap">
-        {funcName !== "when" && (
+        {funcName !== "when" && funcName !== "loop" && (
           <Select
             defaultValue={payload.actionDataType}
             value={funcDataType}
@@ -1778,29 +2352,34 @@ const FunctionActionInput = (payload: {
           }
         />
 
-        {paramsCount !== 0 && funcName !== "if" && funcName !== "when" && (
-          <Input
-            ref={inputRef}
-            className={cn(
-              "flex-1 min-w-[80px] h-7 text-xs transition-all duration-200",
-              "focus:ring-2 focus:ring-primary/20",
-            )}
-            placeholder={
-              paramsCount === "n"
-                ? "@arg1, @arg2"
-                : Array.from({ length: paramsCount as number })
-                    .map((_, i) => `@arg${i + 1}`)
-                    .join(", ")
-            }
-            value={value}
-            onChange={handleInputChange}
-            onFocus={() => { inputFocusedRef.current = true; }}
-            onBlur={() => {
-              inputFocusedRef.current = false;
-              setTimeout(() => setAtQuery(null), 150);
-            }}
-          />
-        )}
+        {paramsCount !== 0 &&
+          funcName !== "if" &&
+          funcName !== "when" &&
+          funcName !== "loop" && (
+            <Input
+              ref={inputRef}
+              className={cn(
+                "flex-1 min-w-[80px] h-7 text-xs transition-all duration-200",
+                "focus:ring-2 focus:ring-primary/20",
+              )}
+              placeholder={
+                paramsCount === "n"
+                  ? "@arg1, @arg2"
+                  : Array.from({ length: paramsCount as number })
+                      .map((_, i) => `@arg${i + 1}`)
+                      .join(", ")
+              }
+              value={value}
+              onChange={handleInputChange}
+              onFocus={() => {
+                inputFocusedRef.current = true;
+              }}
+              onBlur={() => {
+                inputFocusedRef.current = false;
+                setTimeout(() => setAtQuery(null), 150);
+              }}
+            />
+          )}
       </div>
 
       {/* If condition builder */}
@@ -1837,8 +2416,17 @@ const FunctionActionInput = (payload: {
         />
       )}
 
+      {/* Loop block — iteration parameters + nested process actions */}
+      {funcName === "loop" && (
+        <LoopBlock
+          functionId={payload.functionId}
+          loopActionId={payload.actionId}
+          outerPrecedingActions={precedingActions}
+        />
+      )}
+
       {/* Suggestion panel */}
-      {funcName !== "if" && funcName !== "when" && (
+      {funcName !== "if" && funcName !== "when" && funcName !== "loop" && (
         <SuggestionPanel
           dataType={funcDataType}
           methodName={funcName}
@@ -1941,10 +2529,22 @@ const InstructionPanel = () => {
                 context
               </span>
               <span>
-                <code className="bg-rose-100 px-1 rounded text-rose-700">if</code> — condition check
+                <code className="bg-rose-100 px-1 rounded text-rose-700">
+                  if
+                </code>{" "}
+                — condition check
               </span>
               <span>
-                <code className="bg-violet-100 px-1 rounded text-violet-700">when</code> — conditional block
+                <code className="bg-violet-100 px-1 rounded text-violet-700">
+                  when
+                </code>{" "}
+                — conditional block
+              </span>
+              <span>
+                <code className="bg-indigo-100 px-1 rounded text-indigo-700">
+                  loop
+                </code>{" "}
+                — iteration block
               </span>
             </div>
           </div>
@@ -2023,71 +2623,132 @@ const FunctionDefiner = () => {
             key={func.id}
             className="w-full p-2 shadow-md shadow-slate-200 rounded-md space-y-1.5"
           >
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">fn</span>
-              <Badge variant="secondary" className="font-mono text-xs py-0">
-                {func.name}
-              </Badge>
-              <Badge variant="outline" className="text-xs py-0 ml-auto">
-                {func.actions.length}
-              </Badge>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  dispatch(
-                    addFunctionAction({
-                      functionId: func.id,
-                      action: { id: "", name: "", dataType: "", value: [] },
-                    }),
-                  )
-                }
-                className="h-6 text-xs gap-1 px-2"
-              >
-                <IconCircleDashedPlus size={12} />
-                Add
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  dispatch(
-                    addFunctionAction({
-                      functionId: func.id,
-                      action: { id: "", name: "if", dataType: "", value: [] },
-                    }),
-                  )
-                }
-                className="h-6 text-xs gap-1 px-2 border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800"
-              >
-                <IconCircleDashedPlus size={12} />
-                Add if
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  dispatch(
-                    addFunctionAction({
-                      functionId: func.id,
-                      action: { id: "", name: "when", dataType: "", value: [] },
-                    }),
-                  )
-                }
-                className="h-6 text-xs gap-1 px-2 border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100 hover:text-violet-800"
-              >
-                <IconCircleDashedPlus size={12} />
-                Add when
-              </Button>
-              <Button
-                onClick={() => toggleDetail(func.id)}
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6"
-              >
-                {isShown(func.id) ? (
-                  <IconEyeMinus size={13} />
-                ) : (
-                  <IconEyePlus size={13} />
-                )}
-              </Button>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">fn</span>
+                <Badge variant="secondary" className="font-mono text-xs py-0">
+                  {func.name}
+                </Badge>
+                <Badge variant="outline" className="text-xs py-0 ml-auto">
+                  {func.actions.length}
+                </Badge>
+                <Button
+                  onClick={() => toggleDetail(func.id)}
+                  size="icon"
+                  variant="ghost"
+                  className={cn(
+                    "h-6 w-6 transition-all duration-200",
+                    "hover:bg-slate-100 active:scale-95",
+                  )}
+                >
+                  {isShown(func.id) ? (
+                    <IconEyeMinus size={13} />
+                  ) : (
+                    <IconEyePlus size={13} />
+                  )}
+                </Button>
+              </div>
+
+              <div className={cn("grid grid-cols-2 gap-1", "lg:grid-cols-4")}>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    dispatch(
+                      addFunctionAction({
+                        functionId: func.id,
+                        action: { id: "", name: "", dataType: "", value: [] },
+                      }),
+                    )
+                  }
+                  className={cn(
+                    "h-7 text-xs gap-1.5 px-2.5",
+                    "border-slate-300 bg-white text-slate-700",
+                    "hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900",
+                    "active:scale-95 transition-all duration-150",
+                  )}
+                >
+                  <IconCircleDashedPlus size={13} className="shrink-0" />
+                  <span className="font-medium">Add</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    dispatch(
+                      addFunctionAction({
+                        functionId: func.id,
+                        action: { id: "", name: "if", dataType: "", value: [] },
+                      }),
+                    )
+                  }
+                  className={cn(
+                    "h-7 text-xs gap-1.5 px-2.5",
+                    "border-rose-300 bg-rose-50 text-rose-700",
+                    "hover:bg-rose-100 hover:border-rose-400 hover:text-rose-800",
+                    "active:scale-95 transition-all duration-150",
+                  )}
+                >
+                  <IconCircleDashedPlus size={13} className="shrink-0" />
+                  <span className="font-medium">If</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    dispatch(
+                      addFunctionAction({
+                        functionId: func.id,
+                        action: {
+                          id: "",
+                          name: "when",
+                          dataType: "",
+                          value: [],
+                        },
+                      }),
+                    )
+                  }
+                  className={cn(
+                    "h-7 text-xs gap-1.5 px-2.5",
+                    "border-violet-300 bg-violet-50 text-violet-700",
+                    "hover:bg-violet-100 hover:border-violet-400 hover:text-violet-800",
+                    "active:scale-95 transition-all duration-150",
+                  )}
+                >
+                  <IconCircleDashedPlus size={13} className="shrink-0" />
+                  <span className="font-medium">When</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    dispatch(
+                      addFunctionAction({
+                        functionId: func.id,
+                        action: {
+                          id: "",
+                          name: "loop",
+                          dataType: "",
+                          value: [],
+                          loopParams: {
+                            start: "0",
+                            end: "@this.length",
+                            step: "1",
+                          },
+                        },
+                      }),
+                    )
+                  }
+                  className={cn(
+                    "h-7 text-xs gap-1.5 px-2.5",
+                    "border-indigo-300 bg-indigo-50 text-indigo-700",
+                    "hover:bg-indigo-100 hover:border-indigo-400 hover:text-indigo-800",
+                    "active:scale-95 transition-all duration-150",
+                  )}
+                >
+                  <IconCircleDashedPlus size={13} className="shrink-0" />
+                  <span className="font-medium">Loop</span>
+                </Button>
+              </div>
             </div>
 
             <div className={isShown(func.id) ? "block" : "hidden"}>

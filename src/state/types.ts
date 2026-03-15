@@ -10,7 +10,12 @@ export interface FunctionActionInterface {
   name: string;
   dataType: string;
   value: any;
-  subActions?: FunctionActionInterface[]; // for "when" conditional blocks
+  subActions?: FunctionActionInterface[]; // for "when" conditional blocks and "loop" iterations
+  loopParams?: {
+    start?: string;
+    end?: string;
+    step?: string;
+  }; // for "loop" action parameters
 }
 
 export interface FunctionInterface {
@@ -34,6 +39,13 @@ export interface EditorState {
   runner: Runner[];
 }
 
+export interface LogEntry {
+  type: "error" | "warning" | "info";
+  message: string;
+  timestamp: number;
+  context?: string; // e.g. function name or step label
+}
+
 export interface LogState {
-  logs: { type: "error" | "warning" | "info"; message: string }[];
+  logs: LogEntry[];
 }

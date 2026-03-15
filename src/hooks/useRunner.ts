@@ -13,13 +13,24 @@ export const useRunner = () => {
 
   const run = () => {
     dispatch(clearLogs());
+    dispatch(
+      addLog({
+        type: "info",
+        message: `Starting execution — ${runner.length} step${runner.length !== 1 ? "s" : ""}`,
+        context: "runner",
+      }),
+    );
+
     try {
       const updatedVariables = variables.map((v) => ({
         ...v,
         value: deepClone(v.value),
       }));
 
-      for (const run of runner) {
+      for (let stepIndex = 0; stepIndex < runner.length; stepIndex++) {
+        const run = runner[stepIndex];
+        const stepLabel = `step ${stepIndex + 1}`;
+
         if (run.type === "set") {
           const variable = updatedVariables.find(
             (v) => v.name === run.target[0],
@@ -31,13 +42,6 @@ export const useRunner = () => {
           if (variableIndex === -1 || !variable) {
             throw new Error(`Variable ${run.target[0]} not found`);
           }
-
-          dispatch(
-            addLog({
-              type: "info",
-              message: `Setting variable ${run.target[0]} to ${run.target[1]}`,
-            }),
-          );
 
           const dataType = variables.find(
             (v) => v.name === run.target[0],
@@ -76,6 +80,14 @@ export const useRunner = () => {
               value: valueReturn,
             }),
           );
+
+          dispatch(
+            addLog({
+              type: "info",
+              message: `${run.target[0]} = ${JSON.stringify(valueReturn)}`,
+              context: stepLabel,
+            }),
+          );
         }
 
         if (run.type === "call") {
@@ -93,20 +105,12 @@ export const useRunner = () => {
             throw new Error(`Function ${run.target[1]} not found`);
           }
 
-          let message = `Function ${run.target[1]} called with`;
-
-          if (variable.value) {
-            message += ` value ${variable.value} and`;
-          }
-
-          if (run.args.length) {
-            message += ` args ${run.args.join(",")}`;
-          }
-
+          const argNames = run.args.length ? run.args.join(", ") : "";
           dispatch(
             addLog({
               type: "info",
-              message,
+              message: `${run.target[0]} ← ${run.target[1]}(${argNames})`,
+              context: stepLabel,
             }),
           );
 
@@ -140,16 +144,26 @@ export const useRunner = () => {
           dispatch(
             addLog({
               type: "info",
-              message: `Result: ${result}`,
+              message: `→ ${JSON.stringify(result)}`,
+              context: run.target[1],
             }),
           );
         }
       }
+
+      dispatch(
+        addLog({
+          type: "info",
+          message: "Execution complete",
+          context: "runner",
+        }),
+      );
     } catch (error: any) {
       dispatch(
         addLog({
           type: "error",
           message: error.message,
+          context: "error",
         }),
       );
     }

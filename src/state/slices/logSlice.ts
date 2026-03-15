@@ -16,9 +16,13 @@ export const logSlice = createSlice({
       action: PayloadAction<{
         type: "error" | "warning" | "info";
         message: string;
+        context?: string;
       }>
     ) => {
-      state.logs.push(action.payload);
+      state.logs.push({
+        ...action.payload,
+        timestamp: Date.now(),
+      });
     },
     clearLogs: (state) => {
       state.logs = [];

@@ -33,8 +33,8 @@ export function uniqueIdentifier(
     "@e": "",
   };
 
-  // Resolves a single standalone token (exact match only)
-  const resolveToken = (token: string): any => {
+  // Resolves a base token (no dot) to its value
+  const resolveBaseToken = (token: string): any => {
     if (token in SPECIAL_IDENTIFIERS) return SPECIAL_IDENTIFIERS[token];
     let match: RegExpExecArray | null;
     if ((match = PATTERNS.ARG.exec(token)) !== null) {
@@ -42,33 +42,50 @@ export function uniqueIdentifier(
       if (index >= 0 && index < args.length) {
         return args[index];
       }
-      return null; // Invalid index
+      return null;
     }
     if ((match = PATTERNS.MATH.exec(token)) !== null) {
       const index = Number(match[1]) - 1;
       if (index >= 0 && index < mathTemp.length) {
         return mathTemp[index];
       }
-      return null; // Invalid index
+      return null;
     }
     if ((match = PATTERNS.TEMP.exec(token)) !== null) {
       const index = Number(match[1]) - 1;
       if (index >= 0 && index < tempVar.length) {
         return tempVar[index];
       }
-      return null; // Invalid index
+      return null;
     }
     if ((match = PATTERNS.PICK.exec(token)) !== null) {
       const index = Number(match[1]) - 1;
       if (index >= 0 && index < stepResults.length) {
-        const result = stepResults[index];
-        // Return the result even if it's undefined - that's the actual value
-        // Only return null if the index is out of bounds
-        return result;
+        return stepResults[index];
       }
-      return null; // Invalid index
+      return null;
     }
-    return null; // not a known token
+    return null;
+  };
+
+  // Resolves a token, supporting dot-property access (e.g. @this.length, @arg1.name)
+  const resolveToken = (token: string): any => {
+    const dotIndex = token.indexOf(".");
+    if (dotIndex === -1) return resolveBaseToken(token);
+
+    const base = token.slice(0, dotIndex);
+    const prop = token.slice(dotIndex + 1);
+    const resolved = resolveBaseToken(base);
+    if (resolved == null || !prop) return null;
+
+    // Walk nested properties (e.g. @this.a.b)
+    const parts = prop.split(".");
+    let value = resolved;
+    for (const p of parts) {
+      if (value == null) return null;
+      value = value[p];
+    }
+    return value ?? null;
   };
 
   // Process each value in the array using optimized pattern matching
@@ -79,7 +96,7 @@ export function uniqueIdentifier(
 
     // Embedded token(s) inside a larger string → string interpolation
     if (v.includes("@")) {
-      return v.replace(/@\w+(?:\([^)]*\))?/g, (token) => {
+      return v.replace(/@\w+(?:\.\w+)*(?:\([^)]*\))?/g, (token) => {
         const resolved = resolveToken(token);
         return resolved !== null ? String(resolved) : token;
       });
@@ -142,11 +159,16 @@ export function fnRunner(
 
     // Resolve all @ tokens and bare string literals to a JS-evaluable expression
     const JS_LITERALS = new Set([
-      "null", "true", "false", "undefined", "NaN", "Infinity",
+      "null",
+      "true",
+      "false",
+      "undefined",
+      "NaN",
+      "Infinity",
     ]);
     const resolveConditionStr = (condition: string): string => {
       // Step 1 — replace @tokens with their JS-safe values
-      let result = condition.replace(/@\w+(?:\([^)]*\))?/g, (token) => {
+      let result = condition.replace(/@\w+(?:\.\w+)*(?:\([^)]*\))?/g, (token) => {
         const val = uniqueIdentifier(
           [token],
           args,
@@ -188,6 +210,170 @@ export function fnRunner(
       actionList: FunctionActionInterface[],
     ): { earlyReturn: boolean; value?: any } => {
       for (const action of actionList) {
+        // "loop" — iteration block: run sub-actions for each iteration
+        if (action.name === "loop") {
+          const params = action.loopParams ?? {};
+          const startVal = params.start
+            ? uniqueIdentifier(
+                [params.start],
+                args,
+                temp,
+                mathTemp,
+                tempVar,
+                stepResults,
+              )[0]
+            : 0;
+          const endVal = params.end
+            ? uniqueIdentifier(
+                [params.end],
+                args,
+                temp,
+                mathTemp,
+                tempVar,
+                stepResults,
+              )[0]
+            : Array.isArray(temp)
+              ? temp.length
+              : 0;
+          const stepVal = params.step
+            ? uniqueIdentifier(
+                [params.step],
+                args,
+                temp,
+                mathTemp,
+                tempVar,
+                stepResults,
+              )[0]
+            : 1;
+
+          const start = Number(startVal) || 0;
+          const end = Number(endVal) || 0;
+          const step = Number(stepVal) || 1;
+
+          if (step === 0) {
+            stepResults.push(temp);
+            continue;
+          }
+
+          const runSubActions = (iterIndex: number): any => {
+            const currentItem = Array.isArray(temp) ? temp[iterIndex] : iterIndex;
+            // When temp is an array, start with the current element so methods
+            // like toUpperCase() apply per-element automatically.
+            let subTemp = Array.isArray(temp)
+              ? deepClone(currentItem)
+              : deepClone(temp);
+            const subStepResults = [...stepResults];
+
+            for (const subAction of action.subActions ?? []) {
+              if (subAction.name === "use") {
+                const parsed = uniqueIdentifier(
+                  subAction.value,
+                  args,
+                  currentItem,
+                  mathTemp,
+                  tempVar,
+                  subStepResults,
+                );
+                subTemp = parsed[0];
+                subStepResults.push(subTemp);
+                continue;
+              }
+
+              if (subAction.name === "temp") {
+                const parsed = uniqueIdentifier(
+                  subAction.value,
+                  args,
+                  subTemp,
+                  mathTemp,
+                  tempVar,
+                  subStepResults,
+                );
+                tempVar.push(parsed[0]);
+                subStepResults.push(subTemp);
+                continue;
+              }
+
+              if (subAction.name === "math") {
+                const parsed = uniqueIdentifier(
+                  subAction.value,
+                  args,
+                  subTemp,
+                  mathTemp,
+                  tempVar,
+                  subStepResults,
+                );
+                const mathResult = evaluate(parsed.join(" "));
+                mathTemp.push(mathResult);
+                subTemp = mathResult;
+                subStepResults.push(subTemp);
+                continue;
+              }
+
+              const subParsed = uniqueIdentifier(
+                subAction.value,
+                args,
+                subTemp,
+                mathTemp,
+                tempVar,
+                subStepResults,
+              );
+
+              if (subAction.name === "return") {
+                return { earlyReturn: true, value: subParsed[0] };
+              }
+
+              if (subAction.name.startsWith(CALL_PREFIX)) {
+                const targetName = subAction.name.slice(CALL_PREFIX.length);
+                const targetFunc = allFunctions?.find(
+                  (f) => f.name === targetName,
+                );
+                if (targetFunc) {
+                  subTemp = fnRunner(
+                    deepClone(subTemp),
+                    subParsed,
+                    targetFunc.actions,
+                    allFunctions,
+                  );
+                }
+                subStepResults.push(subTemp);
+                continue;
+              }
+
+              const wrapped = wrapPrimitive(subTemp);
+              if (wrapped != null && typeof wrapped[subAction.name] === "function") {
+                subTemp = unwrapPrimitive(wrapped[subAction.name](...subParsed));
+              } else if (wrapped != null) {
+                subTemp = unwrapPrimitive(wrapped[subAction.name]);
+              }
+              subStepResults.push(subTemp);
+            }
+            return subTemp;
+          };
+
+          const results: any[] = [];
+          if (step > 0) {
+            for (let i = start; i < end; i += step) {
+              const result = runSubActions(i);
+              if (result && typeof result === "object" && result.earlyReturn) {
+                return result;
+              }
+              results.push(result);
+            }
+          } else {
+            for (let i = start; i > end; i += step) {
+              const result = runSubActions(i);
+              if (result && typeof result === "object" && result.earlyReturn) {
+                return result;
+              }
+              results.push(result);
+            }
+          }
+
+          temp = results.length > 0 ? results : temp;
+          stepResults.push(temp);
+          continue;
+        }
+
         // "when" — conditional block: run sub-actions only if condition is true
         if (action.name === "when") {
           const condExpr = Array.isArray(action.value)
