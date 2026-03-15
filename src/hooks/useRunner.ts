@@ -9,9 +9,9 @@ import { addLog, clearLogs } from "@/state/slices/logSlice";
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 
 export const useRunner = () => {
-  const variables = useAppSelector((state) => state.editor.variables);
-  const functions = useAppSelector((state) => state.editor.functions);
-  const runner = useAppSelector((state) => state.editor.runner);
+  const variables = useAppSelector((state) => state.editor.packages.find(p => p.id === state.editor.activePackageId)!.variables);
+  const functions = useAppSelector((state) => state.editor.packages.find(p => p.id === state.editor.activePackageId)!.functions);
+  const runner = useAppSelector((state) => state.editor.packages.find(p => p.id === state.editor.activePackageId)!.runner);
   const dispatch = useAppDispatch();
 
   const run = async () => {

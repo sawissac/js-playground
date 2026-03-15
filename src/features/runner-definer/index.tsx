@@ -115,8 +115,8 @@ const RunnerInput = (payload: {
   isDragOver: boolean;
 }) => {
   const dispatch = useAppDispatch();
-  const variables = useAppSelector((state) => state.editor.variables);
-  const functions = useAppSelector((state) => state.editor.functions);
+  const variables = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.variables);
+  const functions = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.functions);
   const [value, setValue] = useState<string>("");
   const [args, setArgs] = useState<string>("");
   const [code, setCode] = useState<string>(payload.runner.code ?? "return @this;\n");
@@ -450,9 +450,9 @@ const RunnerInput = (payload: {
 
 const RunnerDefiner = () => {
   const dispatch = useAppDispatch();
-  const variables = useAppSelector((state) => state.editor.variables);
-  const functions = useAppSelector((state) => state.editor.functions);
-  const runner = useAppSelector((state) => state.editor.runner);
+  const variables = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.variables);
+  const functions = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.functions);
+  const runner = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.runner);
   const { run } = useRunner();
   const [dragState, setDragState] = React.useState<{
     dragIndex: number | null;

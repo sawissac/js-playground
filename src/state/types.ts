@@ -40,12 +40,21 @@ export interface Runner {
   code?: string;
 }
 
-export interface EditorState {
-  dataTypes: string[];
+export interface Package {
+  id: string;
+  name: string;
   variables: VariableInterface[];
   functions: FunctionInterface[];
   runner: Runner[];
   codeSnippets: CodeSnippetInterface[];
+}
+
+export interface EditorState {
+  projectId: string;
+  projectName: string;
+  packages: Package[];
+  activePackageId: string;
+  dataTypes: string[];
 }
 
 export interface LogEntry {

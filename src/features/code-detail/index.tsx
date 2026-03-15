@@ -213,7 +213,7 @@ const ObjectCard = ({
 };
 
 const ObjectsTab = () => {
-  const variables = useAppSelector((s) => s.editor.variables);
+  const variables = useAppSelector((s) => s.editor.packages.find(p => p.id === s.editor.activePackageId)!.variables);
   const dataTypes = useAppSelector((s) => s.editor.dataTypes);
 
   if (variables.length === 0) {
@@ -339,9 +339,9 @@ const FlowChartTab = () => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<any>(null);
-  const variables = useAppSelector((s) => s.editor.variables);
-  const functions = useAppSelector((s) => s.editor.functions);
-  const runner = useAppSelector((s) => s.editor.runner);
+  const variables = useAppSelector((s) => s.editor.packages.find(p => p.id === s.editor.activePackageId)!.variables);
+  const functions = useAppSelector((s) => s.editor.packages.find(p => p.id === s.editor.activePackageId)!.functions);
+  const runner = useAppSelector((s) => s.editor.packages.find(p => p.id === s.editor.activePackageId)!.runner);
 
   const isEmpty = variables.length === 0 && functions.length === 0;
 
@@ -649,12 +649,13 @@ const FlowChartTab = () => {
 
 const ExportPreviewTab = () => {
   const editorState = useAppSelector((s) => s.editor);
+  const activePackage = editorState.packages.find((p) => p.id === editorState.activePackageId)!;
 
   const exportData = {
-    variables: editorState.variables,
-    functions: editorState.functions,
-    runner: editorState.runner,
-    codeSnippets: editorState.codeSnippets || [],
+    variables: activePackage.variables,
+    functions: activePackage.functions,
+    runner: activePackage.runner,
+    codeSnippets: activePackage.codeSnippets || [],
     exportDate: new Date().toISOString(),
     version: "1.0",
   };
@@ -662,9 +663,9 @@ const ExportPreviewTab = () => {
   const jsonString = JSON.stringify(exportData, null, 2);
 
   const hasData =
-    editorState.variables.length > 0 ||
-    editorState.functions.length > 0 ||
-    editorState.runner.length > 0;
+    activePackage.variables.length > 0 ||
+    activePackage.functions.length > 0 ||
+    activePackage.runner.length > 0;
 
   if (!hasData) {
     return (

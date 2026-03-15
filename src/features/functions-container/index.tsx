@@ -68,7 +68,7 @@ const InstructionPanel = () => {
 
 const FunctionsContainer = () => {
   const dispatch = useAppDispatch();
-  const functions = useAppSelector((state) => state.editor.functions);
+  const functions = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.functions);
   const [oldFunctionName, setOldFunctionName] = useState("");
   const [newFunctionName, setNewFunctionName] = useState("");
   const [isEditing, setIsEditing] = useState(false);

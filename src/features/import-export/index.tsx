@@ -67,16 +67,17 @@ const InstructionPanel = () => {
 const ImportExport = () => {
   const dispatch = useAppDispatch();
   const editorState = useAppSelector((state) => state.editor);
+  const activePackage = editorState.packages.find((p) => p.id === editorState.activePackageId)!;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
 
   const handleExport = () => {
     try {
       const exportData = {
-        variables: editorState.variables,
-        functions: editorState.functions,
-        runner: editorState.runner,
-        codeSnippets: editorState.codeSnippets || [],
+        variables: activePackage.variables,
+        functions: activePackage.functions,
+        runner: activePackage.runner,
+        codeSnippets: activePackage.codeSnippets || [],
         exportDate: new Date().toISOString(),
         version: "1.0",
       };
@@ -161,9 +162,9 @@ const ImportExport = () => {
   };
 
   const hasData =
-    editorState.variables.length > 0 ||
-    editorState.functions.length > 0 ||
-    editorState.runner.length > 0;
+    activePackage.variables.length > 0 ||
+    activePackage.functions.length > 0 ||
+    activePackage.runner.length > 0;
 
   return (
     <div
@@ -192,9 +193,9 @@ const ImportExport = () => {
               "bg-green-50 text-green-700 border-green-200",
             )}
           >
-            {editorState.variables.length +
-              editorState.functions.length +
-              editorState.runner.length}{" "}
+            {activePackage.variables.length +
+              activePackage.functions.length +
+              activePackage.runner.length}{" "}
             items
           </Badge>
         )}

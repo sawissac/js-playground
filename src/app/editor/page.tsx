@@ -16,7 +16,7 @@ import RunnerDefiner from "@/features/runner-definer";
 import LogContainer from "@/features/log-container";
 import CodeSidebar from "@/features/code-sidebar";
 import CodeDetail from "@/features/code-detail";
-import ImportExport from "@/features/import-export";
+import ProjectSidebar from "@/features/project-sidebar";
 import { cn } from "@/lib/utils";
 import {
   PanelLeftCloseIcon,
@@ -74,10 +74,16 @@ const Page = () => {
       {/* Desktop Layout (lg and up) */}
       <div className={cn("hidden lg:block w-full h-screen")}>
         <ResizablePanelGroup direction="horizontal" className="w-full h-full">
+          {/* Project Sidebar */}
+          <ResizablePanel defaultSize={14} minSize={10} maxSize={20}>
+            <ProjectSidebar />
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+
           {/* Left Panel — Definitions + Code Preview */}
           <ResizablePanel
             ref={leftPanelRef}
-            defaultSize={22}
+            defaultSize={20}
             minSize={16}
             maxSize={30}
             collapsible
@@ -102,8 +108,6 @@ const Page = () => {
                   <DataTypeContainer />
                   <hr className="border-border" />
                   <FunctionsContainer />
-                  <hr className="border-border" />
-                  <ImportExport />
                 </div>
               </ResizablePanel>
               <ResizableHandle withHandle />
@@ -131,7 +135,7 @@ const Page = () => {
           <ResizableHandle withHandle />
 
           {/* Center Panel — Function Actions (main editing area) */}
-          <ResizablePanel defaultSize={40} minSize={28}>
+          <ResizablePanel defaultSize={36} minSize={28}>
             <div className="h-full flex flex-col">
               {/* Panel toggle toolbar */}
               <div className="shrink-0 flex items-center justify-between px-2 py-1 border-b border-border bg-muted/30">
@@ -194,7 +198,7 @@ const Page = () => {
           {/* Right Panel — Runner + Code Detail + Log */}
           <ResizablePanel
             ref={rightPanelRef}
-            defaultSize={38}
+            defaultSize={30}
             minSize={24}
             collapsible
             collapsedSize={0}
@@ -270,6 +274,11 @@ const Page = () => {
         )}
       >
         <div className="flex flex-col gap-2 p-2">
+          {/* Row 0: Project Sidebar Full Width Option */}
+          <div className="w-full bg-slate-50 border rounded-lg overflow-hidden h-64">
+            <ProjectSidebar />
+          </div>
+
           {/* Row 1: Definitions + Function Actions side by side */}
           <div className="grid grid-cols-2 gap-2">
             <div
@@ -286,8 +295,6 @@ const Page = () => {
               <DataTypeContainer />
               <hr className="border-border" />
               <FunctionsContainer />
-              <hr className="border-border" />
-              <ImportExport />
             </div>
             <div
               className={cn(
@@ -347,6 +354,9 @@ const Page = () => {
       {/* Mobile Layout (below md) — sequential workflow */}
       <div className={cn("block md:hidden w-full h-screen overflow-y-auto")}>
         <div className="flex flex-col gap-2 p-2">
+          <div className="w-full bg-slate-50 border rounded-lg overflow-hidden h-64">
+            <ProjectSidebar />
+          </div>
           {/* Step 1: Define */}
           <div
             className={cn(
@@ -376,15 +386,6 @@ const Page = () => {
             )}
           >
             <FunctionsContainer />
-          </div>
-          <hr className="border-border" />
-          <div
-            className={cn(
-              "flex flex-col gap-2",
-              "animate-in fade-in duration-300 delay-125",
-            )}
-          >
-            <ImportExport />
           </div>
 
           {/* Step 2: Build */}

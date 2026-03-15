@@ -1231,7 +1231,7 @@ const WhenSubActionRow = ({
 }) => {
   const dispatch = useAppDispatch();
   const dataTypes = useAppSelector((state) => state.editor.dataTypes);
-  const functions = useAppSelector((state) => state.editor.functions);
+  const functions = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.functions);
   const [value, setValue] = React.useState("");
   const [atQuery, setAtQuery] = React.useState<string | null>(null);
   const [showExamples, setShowExamples] = React.useState(true);
@@ -1248,7 +1248,7 @@ const WhenSubActionRow = ({
   const subActionValue = (subAction?.value?.join(",") ?? "") as string;
   const subActionCodeName = subAction?.codeName ?? "";
 
-  const codeSnippets = useAppSelector((state) => state.editor.codeSnippets);
+  const codeSnippets = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.codeSnippets);
   const [codeName, setCodeName] = React.useState(subActionCodeName);
   const codeNameRef = React.useRef(subActionCodeName);
 
@@ -1624,7 +1624,7 @@ const LoopSubActionRow = ({
 }) => {
   const dispatch = useAppDispatch();
   const dataTypes = useAppSelector((state) => state.editor.dataTypes);
-  const functions = useAppSelector((state) => state.editor.functions);
+  const functions = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.functions);
   const [value, setValue] = React.useState("");
   const [atQuery, setAtQuery] = React.useState<string | null>(null);
   const [showExamples, setShowExamples] = React.useState(true);
@@ -1641,7 +1641,7 @@ const LoopSubActionRow = ({
   const subActionValue = (subAction?.value?.join(",") ?? "") as string;
   const subActionCodeName = subAction?.codeName ?? "";
 
-  const codeSnippets = useAppSelector((state) => state.editor.codeSnippets);
+  const codeSnippets = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.codeSnippets);
   const [codeName, setCodeName] = React.useState(subActionCodeName);
   const codeNameRef = React.useRef(subActionCodeName);
 
@@ -2011,7 +2011,7 @@ const LoopBlock = ({
   outerPrecedingActions: FunctionActionInterface[];
 }) => {
   const dispatch = useAppDispatch();
-  const functions = useAppSelector((state) => state.editor.functions);
+  const functions = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.functions);
 
   const loopAction = functions
     .find((fn) => fn.id === functionId)
@@ -2190,7 +2190,7 @@ const WhenBlock = ({
   onConditionChange: (expr: string) => void;
 }) => {
   const dispatch = useAppDispatch();
-  const functions = useAppSelector((state) => state.editor.functions);
+  const functions = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.functions);
 
   const subActions =
     functions
@@ -2275,7 +2275,7 @@ const FunctionActionInput = (payload: {
 }) => {
   const dispatch = useAppDispatch();
   const dataTypes = useAppSelector((state) => state.editor.dataTypes);
-  const functions = useAppSelector((state) => state.editor.functions);
+  const functions = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.functions);
   const [value, setValue] = React.useState("");
   const [atQuery, setAtQuery] = React.useState<string | null>(null);
   const [showExamples, setShowExamples] = React.useState(true);
@@ -2316,7 +2316,7 @@ const FunctionActionInput = (payload: {
       ?.actions.find((a) => a.id === payload.actionId)?.codeName ?? "";
   }, [functions, payload.functionId, payload.actionId]);
 
-  const codeSnippets = useAppSelector((state) => state.editor.codeSnippets);
+  const codeSnippets = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.codeSnippets);
   const [codeName, setCodeName] = React.useState(funcCodeName);
   const codeNameRef = React.useRef(funcCodeName);
 
@@ -2857,7 +2857,7 @@ const InstructionPanel = () => {
 
 const FunctionDefiner = () => {
   const dispatch = useAppDispatch();
-  const functions = useAppSelector((state) => state.editor.functions);
+  const functions = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.functions);
   const [showDetails, setShowDetails] = React.useState<Record<string, boolean>>(
     {},
   );

@@ -53,7 +53,7 @@ const InstructionPanel = () => {
 
 const DataTypeContainer = () => {
   const dispatch = useAppDispatch();
-  const variables = useAppSelector((state) => state.editor.variables);
+  const variables = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.variables);
   const dataTypes = useAppSelector((state) => state.editor.dataTypes);
   const [showDetail, setShowDetail] = React.useState(true);
 

@@ -7,81 +7,142 @@ import {
   EditorState,
   FunctionActionInterface,
   Runner,
+  Package,
 } from "../types";
 import { DataTypes } from "@/constants/dataTypes";
 
-// Define the initial state for the editor
+const initialPackageId = "466f7e20-1465-45ae-a93b-30da6a6a54f1-pkg";
+
 const initialState: EditorState = {
-  variables: [
-    {
-      id: "466f7e20-1465-45ae-a93b-30da6a6a54f1",
-      name: "v1",
-      type: "string",
-      value: "Hello World",
-    },
-    {
-      id: "47d03f92-04dd-4274-b763-607051c35b4a",
-      name: "v2",
-      type: "string",
-      value: "Hello World",
-    },
-  ],
+  projectId: uuidv4(),
+  projectName: "My Project",
+  activePackageId: initialPackageId,
   dataTypes: [...DataTypes],
-  functions: [
+  packages: [
     {
-      id: "ec1b11ec-0552-414c-967b-388c2c3a1ce1",
-      name: "t1",
-      dataType: "",
-      actions: [
+      id: initialPackageId,
+      name: "Main Package",
+      variables: [
         {
-          id: "f459b781-70d4-42ff-bd28-5ca45399cc13",
-          name: "temp",
-          dataType: "string",
-          value: ["@arg1"],
+          id: "466f7e20-1465-45ae-a93b-30da6a6a54f1",
+          name: "v1",
+          type: "string",
+          value: "Hello World",
         },
         {
-          id: "a10aceab-5e44-43e9-9c0a-50e655cd0a91",
-          name: "use",
-          dataType: "string",
-          value: ["@temp1"],
-        },
-        {
-          id: "e81c37ee-a78c-45cd-9f1c-85002336c6e8",
-          name: "code",
-          dataType: "string",
-          value: ["return @this;\n"],
+          id: "47d03f92-04dd-4274-b763-607051c35b4a",
+          name: "v2",
+          type: "string",
+          value: "Hello World",
         },
       ],
+      functions: [
+        {
+          id: "ec1b11ec-0552-414c-967b-388c2c3a1ce1",
+          name: "t1",
+          dataType: "",
+          actions: [
+            {
+              id: "f459b781-70d4-42ff-bd28-5ca45399cc13",
+              name: "temp",
+              dataType: "string",
+              value: ["@arg1"],
+            },
+            {
+              id: "a10aceab-5e44-43e9-9c0a-50e655cd0a91",
+              name: "use",
+              dataType: "string",
+              value: ["@temp1"],
+            },
+            {
+              id: "e81c37ee-a78c-45cd-9f1c-85002336c6e8",
+              name: "code",
+              dataType: "string",
+              value: ["return @this;\n"],
+            },
+          ],
+        },
+      ],
+      runner: [
+        {
+          id: "0f110169-55df-4840-8906-cbf7309380b2",
+          type: "set",
+          target: ["v1", "Hello World"],
+          args: [],
+        },
+        {
+          id: "f0ba02dd-e170-4367-b78e-ba14073e9e84",
+          type: "call",
+          target: ["v2", "t1"],
+          args: ["v1"],
+        },
+      ],
+      codeSnippets: [],
     },
   ],
-  runner: [
-    {
-      id: "0f110169-55df-4840-8906-cbf7309380b2",
-      type: "set",
-      target: ["v1", "Hello World"],
-      args: [],
-    },
-    {
-      id: "f0ba02dd-e170-4367-b78e-ba14073e9e84",
-      type: "call",
-      target: ["v2", "t1"],
-      args: ["v1"],
-    },
-  ],
-  codeSnippets: [],
+};
+
+const getActivePkg = (state: EditorState) => {
+  return state.packages.find((p) => p.id === state.activePackageId)!;
 };
 
 export const editorSlice = createSlice({
   name: "editor",
   initialState,
   reducers: {
+    // Project & Package Reducers
+    setProjectName: (state, action: PayloadAction<string>) => {
+      state.projectName = action.payload;
+    },
+    addPackage: (state, action: PayloadAction<{ name: string }>) => {
+      const newPkg: Package = {
+        id: uuidv4(),
+        name: action.payload.name,
+        variables: [],
+        functions: [],
+        runner: [],
+        codeSnippets: [],
+      };
+      state.packages.push(newPkg);
+      state.activePackageId = newPkg.id; // Switch to the new package automatically
+    },
+    removePackage: (state, action: PayloadAction<string>) => {
+      if (state.packages.length <= 1) return; // Must have at least one package
+      state.packages = state.packages.filter((p) => p.id !== action.payload);
+      if (state.activePackageId === action.payload) {
+        state.activePackageId = state.packages[0].id;
+      }
+    },
+    renamePackage: (state, action: PayloadAction<{ id: string; name: string }>) => {
+      const pkg = state.packages.find((p) => p.id === action.payload.id);
+      if (pkg) {
+        pkg.name = action.payload.name;
+      }
+    },
+    setActivePackage: (state, action: PayloadAction<string>) => {
+      if (state.packages.some((p) => p.id === action.payload)) {
+        state.activePackageId = action.payload;
+      }
+    },
+    importProject: (state, action: PayloadAction<EditorState>) => {
+      return action.payload;
+    },
+    importPackage: (state, action: PayloadAction<Package>) => {
+      // Import into current project as a new package
+      const newPkg = { ...action.payload, id: uuidv4() };
+      state.packages.push(newPkg);
+      state.activePackageId = newPkg.id;
+    },
+
+    // Variable Reducers
     setVariables: (
       state,
       action: PayloadAction<
         { id: string; name: string; type: string; value: any }[]
       >,
     ) => {
-      state.variables = action.payload;
+      const pkg = getActivePkg(state);
+      pkg.variables = action.payload;
     },
 
     addVariable: (
@@ -91,7 +152,8 @@ export const editorSlice = createSlice({
         name: string;
       }>,
     ) => {
-      state.variables.push({
+      const pkg = getActivePkg(state);
+      pkg.variables.push({
         id: action.payload.id,
         name: action.payload.name,
         type: "string",
@@ -100,7 +162,8 @@ export const editorSlice = createSlice({
     },
 
     removeVariable: (state, action: PayloadAction<string>) => {
-      state.variables = state.variables.filter(
+      const pkg = getActivePkg(state);
+      pkg.variables = pkg.variables.filter(
         (variable) => variable.id !== action.payload,
       );
     },
@@ -112,7 +175,8 @@ export const editorSlice = createSlice({
         newName: string;
       }>,
     ) => {
-      state.variables = state.variables.map((variable) =>
+      const pkg = getActivePkg(state);
+      pkg.variables = pkg.variables.map((variable) =>
         variable.id === action.payload.id
           ? { ...variable, name: action.payload.newName }
           : variable,
@@ -126,7 +190,8 @@ export const editorSlice = createSlice({
         value: string | string[];
       }>,
     ) => {
-      state.variables = state.variables.map((variable) =>
+      const pkg = getActivePkg(state);
+      pkg.variables = pkg.variables.map((variable) =>
         variable.id === action.payload.id
           ? { ...variable, value: action.payload.value }
           : variable,
@@ -140,7 +205,8 @@ export const editorSlice = createSlice({
         type: string;
       }>,
     ) => {
-      state.variables = state.variables.map((variable) =>
+      const pkg = getActivePkg(state);
+      pkg.variables = pkg.variables.map((variable) =>
         variable.id === action.payload.id
           ? { ...variable, type: action.payload.type }
           : variable,
@@ -150,8 +216,9 @@ export const editorSlice = createSlice({
     addFunctionName: (state, action: PayloadAction<string>) => {
       const tempActionId = uuidv4();
       const useActionId = uuidv4();
+      const pkg = getActivePkg(state);
 
-      state.functions.push({
+      pkg.functions.push({
         id: uuidv4(),
         name: action.payload,
         dataType: "",
@@ -179,7 +246,8 @@ export const editorSlice = createSlice({
         newName: string;
       }>,
     ) => {
-      state.functions = state.functions.map((func) =>
+      const pkg = getActivePkg(state);
+      pkg.functions = pkg.functions.map((func) =>
         func.id === action.payload.id
           ? { ...func, name: action.payload.newName }
           : func,
@@ -187,7 +255,8 @@ export const editorSlice = createSlice({
     },
 
     removeFunctionName: (state, action: PayloadAction<string>) => {
-      state.functions = state.functions.filter(
+      const pkg = getActivePkg(state);
+      pkg.functions = pkg.functions.filter(
         (func) => func.id !== action.payload,
       );
     },
@@ -199,7 +268,8 @@ export const editorSlice = createSlice({
         action: FunctionActionInterface;
       }>,
     ) => {
-      const func = state.functions.find(
+      const pkg = getActivePkg(state);
+      const func = pkg.functions.find(
         (f) => f.id === action.payload.functionId,
       );
       if (func) {
@@ -216,7 +286,8 @@ export const editorSlice = createSlice({
         action: FunctionActionInterface;
       }>,
     ) => {
-      const func = state.functions.find(
+      const pkg = getActivePkg(state);
+      const func = pkg.functions.find(
         (f) => f.id === action.payload.functionId,
       );
       if (func) {
@@ -238,7 +309,8 @@ export const editorSlice = createSlice({
       state,
       action: PayloadAction<{ functionId: string; actionId: string }>,
     ) => {
-      const func = state.functions.find(
+      const pkg = getActivePkg(state);
+      const func = pkg.functions.find(
         (f) => f.id === action.payload.functionId,
       );
       if (func) {
@@ -249,7 +321,8 @@ export const editorSlice = createSlice({
     },
 
     createSetRunner: (state) => {
-      state.runner.push({
+      const pkg = getActivePkg(state);
+      pkg.runner.push({
         id: uuidv4(),
         type: "set",
         target: ["", ""],
@@ -258,7 +331,8 @@ export const editorSlice = createSlice({
     },
 
     createCallRunner: (state) => {
-      state.runner.push({
+      const pkg = getActivePkg(state);
+      pkg.runner.push({
         id: uuidv4(),
         type: "call",
         target: ["", ""],
@@ -267,7 +341,8 @@ export const editorSlice = createSlice({
     },
 
     createCodeRunner: (state) => {
-      state.runner.push({
+      const pkg = getActivePkg(state);
+      pkg.runner.push({
         id: uuidv4(),
         type: "code",
         target: ["", ""],
@@ -280,11 +355,12 @@ export const editorSlice = createSlice({
       state,
       action: PayloadAction<{ runnerId: string; runner: Runner }>,
     ) => {
-      const runnerIndex = state.runner.findIndex(
+      const pkg = getActivePkg(state);
+      const runnerIndex = pkg.runner.findIndex(
         (r) => r.id === action.payload.runnerId,
       );
       if (runnerIndex !== -1) {
-        state.runner[runnerIndex] = {
+        pkg.runner[runnerIndex] = {
           ...action.payload.runner,
           id: action.payload.runnerId,
         };
@@ -292,7 +368,8 @@ export const editorSlice = createSlice({
     },
 
     removeRunner: (state, action: PayloadAction<string>) => {
-      state.runner = state.runner.filter(
+      const pkg = getActivePkg(state);
+      pkg.runner = pkg.runner.filter(
         (runner) => runner.id !== action.payload,
       );
     },
@@ -305,7 +382,8 @@ export const editorSlice = createSlice({
         subAction: FunctionActionInterface;
       }>,
     ) => {
-      const func = state.functions.find(
+      const pkg = getActivePkg(state);
+      const func = pkg.functions.find(
         (f) => f.id === action.payload.functionId,
       );
       if (func) {
@@ -330,7 +408,8 @@ export const editorSlice = createSlice({
         subActionId: string;
       }>,
     ) => {
-      const func = state.functions.find(
+      const pkg = getActivePkg(state);
+      const func = pkg.functions.find(
         (f) => f.id === action.payload.functionId,
       );
       if (func) {
@@ -354,7 +433,8 @@ export const editorSlice = createSlice({
         subAction: FunctionActionInterface;
       }>,
     ) => {
-      const func = state.functions.find(
+      const pkg = getActivePkg(state);
+      const func = pkg.functions.find(
         (f) => f.id === action.payload.functionId,
       );
       if (func) {
@@ -384,7 +464,8 @@ export const editorSlice = createSlice({
         toIndex: number;
       }>,
     ) => {
-      const func = state.functions.find(
+      const pkg = getActivePkg(state);
+      const func = pkg.functions.find(
         (f) => f.id === action.payload.functionId,
       );
       if (func) {
@@ -407,7 +488,8 @@ export const editorSlice = createSlice({
         subAction: FunctionActionInterface;
       }>,
     ) => {
-      const func = state.functions.find(
+      const pkg = getActivePkg(state);
+      const func = pkg.functions.find(
         (f) => f.id === action.payload.functionId,
       );
       if (func) {
@@ -432,7 +514,8 @@ export const editorSlice = createSlice({
         subActionId: string;
       }>,
     ) => {
-      const func = state.functions.find(
+      const pkg = getActivePkg(state);
+      const func = pkg.functions.find(
         (f) => f.id === action.payload.functionId,
       );
       if (func) {
@@ -456,7 +539,8 @@ export const editorSlice = createSlice({
         subAction: FunctionActionInterface;
       }>,
     ) => {
-      const func = state.functions.find(
+      const pkg = getActivePkg(state);
+      const func = pkg.functions.find(
         (f) => f.id === action.payload.functionId,
       );
       if (func) {
@@ -485,7 +569,8 @@ export const editorSlice = createSlice({
         loopParams: { start?: string; end?: string; step?: string };
       }>,
     ) => {
-      const func = state.functions.find(
+      const pkg = getActivePkg(state);
+      const func = pkg.functions.find(
         (f) => f.id === action.payload.functionId,
       );
       if (func) {
@@ -506,7 +591,8 @@ export const editorSlice = createSlice({
         toIndex: number;
       }>,
     ) => {
-      const func = state.functions.find(
+      const pkg = getActivePkg(state);
+      const func = pkg.functions.find(
         (f) => f.id === action.payload.functionId,
       );
       if (func) {
@@ -522,22 +608,24 @@ export const editorSlice = createSlice({
       state,
       action: PayloadAction<{ fromIndex: number; toIndex: number }>,
     ) => {
+      const pkg = getActivePkg(state);
       const { fromIndex, toIndex } = action.payload;
-      const [movedRunner] = state.runner.splice(fromIndex, 1);
-      state.runner.splice(toIndex, 0, movedRunner);
+      const [movedRunner] = pkg.runner.splice(fromIndex, 1);
+      pkg.runner.splice(toIndex, 0, movedRunner);
     },
 
     addCodeSnippet: (
       state,
       action: PayloadAction<{ name: string; code: string }>,
     ) => {
-      const existing = state.codeSnippets.find(
+      const pkg = getActivePkg(state);
+      const existing = pkg.codeSnippets.find(
         (s) => s.name === action.payload.name,
       );
       if (existing) {
         existing.code = action.payload.code;
       } else {
-        state.codeSnippets.push({
+        pkg.codeSnippets.push({
           id: uuidv4(),
           name: action.payload.name,
           code: action.payload.code,
@@ -552,42 +640,55 @@ export const editorSlice = createSlice({
         snippet: Partial<CodeSnippetInterface>;
       }>,
     ) => {
-      const idx = state.codeSnippets.findIndex(
+      const pkg = getActivePkg(state);
+      const idx = pkg.codeSnippets.findIndex(
         (s) => s.id === action.payload.id,
       );
       if (idx !== -1) {
-        state.codeSnippets[idx] = {
-          ...state.codeSnippets[idx],
+        pkg.codeSnippets[idx] = {
+          ...pkg.codeSnippets[idx],
           ...action.payload.snippet,
         };
       }
     },
 
     removeCodeSnippet: (state, action: PayloadAction<string>) => {
-      state.codeSnippets = state.codeSnippets.filter(
+      const pkg = getActivePkg(state);
+      pkg.codeSnippets = pkg.codeSnippets.filter(
         (s) => s.id !== action.payload,
       );
     },
 
-    importState: (state, action: PayloadAction<Partial<EditorState>>) => {
+    importState: (state, action: PayloadAction<Partial<Package>>) => {
+      // Legacy import for a single package into current package
       const importedState = action.payload;
-      if (importedState.variables) state.variables = importedState.variables;
-      if (importedState.functions) state.functions = importedState.functions;
-      if (importedState.runner) state.runner = importedState.runner;
+      const pkg = getActivePkg(state);
+      if (importedState.variables) pkg.variables = importedState.variables;
+      if (importedState.functions) pkg.functions = importedState.functions;
+      if (importedState.runner) pkg.runner = importedState.runner;
       if (importedState.codeSnippets)
-        state.codeSnippets = importedState.codeSnippets;
+        pkg.codeSnippets = importedState.codeSnippets;
     },
 
     resetState: (state) => {
-      state.variables = [];
-      state.functions = [];
-      state.runner = [];
-      state.codeSnippets = [];
+      // Resets the active package
+      const pkg = getActivePkg(state);
+      pkg.variables = [];
+      pkg.functions = [];
+      pkg.runner = [];
+      pkg.codeSnippets = [];
     },
   },
 });
 
 export const {
+  setProjectName,
+  addPackage,
+  removePackage,
+  renamePackage,
+  setActivePackage,
+  importProject,
+  importPackage,
   setVariables,
   addVariable,
   removeVariable,
@@ -622,5 +723,4 @@ export const {
   resetState,
 } = editorSlice.actions;
 
-// Export the reducer
 export default editorSlice.reducer;
