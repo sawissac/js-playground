@@ -50,6 +50,7 @@ import {
   IconTrash,
 } from "@tabler/icons-react";
 import React, { useMemo } from "react";
+import { HelpModal } from "@/features/help-modal";
 
 // ─── Method descriptions ──────────────────────────────────────────────────────
 
@@ -2908,7 +2909,14 @@ const FunctionDefiner = () => {
 
   return (
     <div className="space-y-2 pb-[300px]">
-      <InstructionPanel />
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <InstructionPanel />
+        </div>
+        <div className="shrink-0 flex items-center justify-center p-1 border rounded-md bg-white border-slate-200">
+          <HelpModal />
+        </div>
+      </div>
 
       {functions.length === 0 ? (
         <p className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-md">

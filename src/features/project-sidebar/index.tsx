@@ -28,7 +28,6 @@ import {
 } from "@tabler/icons-react";
 import { addLog } from "@/state/slices/logSlice";
 import { Package } from "@/state/types";
-import { HelpModal } from "@/features/help-modal";
 
 const ProjectSidebar = () => {
   const dispatch = useAppDispatch();
@@ -169,7 +168,6 @@ const ProjectSidebar = () => {
           <Badge variant="outline" className="text-[10px] bg-slate-200">
             Project Workspace
           </Badge>
-          <HelpModal />
         </div>
         
         {isEditingProject ? (
