@@ -5,13 +5,16 @@ import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { updateVariableValue } from "@/state/slices/editorSlice";
 import { addLog, clearLogs } from "@/state/slices/logSlice";
 
+// AsyncFunction constructor for async code blocks
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+
 export const useRunner = () => {
   const variables = useAppSelector((state) => state.editor.variables);
   const functions = useAppSelector((state) => state.editor.functions);
   const runner = useAppSelector((state) => state.editor.runner);
   const dispatch = useAppDispatch();
 
-  const run = () => {
+  const run = async () => {
     dispatch(clearLogs());
     dispatch(
       addLog({
@@ -90,6 +93,87 @@ export const useRunner = () => {
           );
         }
 
+        if (run.type === "code") {
+          const variable = updatedVariables.find(
+            (v) => v.name === run.target[0],
+          );
+
+          if (!variable) {
+            throw new Error(`Variable ${run.target[0]} not found`);
+          }
+
+          dispatch(
+            addLog({
+              type: "info",
+              message: `${run.target[0]} ← code block`,
+              context: stepLabel,
+            }),
+          );
+
+          // Build token context
+          const tokenCtx: Record<string, any> = {
+            this: deepClone(variable.value),
+            t: deepClone(variable.value),
+            space: " ",
+            s: " ",
+            comma: ",",
+            c: ",",
+            empty: "",
+            e: "",
+          };
+
+          // Transform code: replace @token with __ctx__["token"]
+          let code = run.code || "return undefined;";
+          code = code.replace(/@(\w+(?:\.\w+)*)/g, (_match, token) => {
+            const dotIndex = token.indexOf(".");
+            if (dotIndex === -1) {
+              return `__ctx__["${token}"]`;
+            }
+            const base = token.slice(0, dotIndex);
+            const rest = token.slice(dotIndex);
+            return `__ctx__["${base}"]${rest}`;
+          });
+
+          // Build safe variable names as function parameters
+          const safeVarNames = updatedVariables
+            .filter((v) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v.name))
+            .map((v) => v.name);
+          const safeVarValues = safeVarNames.map((name) => {
+            const v = updatedVariables.find((uv) => uv.name === name);
+            return deepClone(v?.value);
+          });
+
+          // eslint-disable-next-line no-new-func
+          const fn = new AsyncFunction("__ctx__", ...safeVarNames, code);
+          const result = await fn(tokenCtx, ...safeVarValues);
+
+          const resultVarIndex = updatedVariables.findIndex(
+            (v) => v.name === variable.name,
+          );
+
+          if (resultVarIndex !== -1) {
+            updatedVariables[resultVarIndex] = {
+              ...updatedVariables[resultVarIndex],
+              value: result,
+            };
+          }
+
+          dispatch(
+            updateVariableValue({
+              id: variable.id,
+              value: result,
+            }),
+          );
+
+          dispatch(
+            addLog({
+              type: "info",
+              message: `→ ${JSON.stringify(result)}`,
+              context: "code",
+            }),
+          );
+        }
+
         if (run.type === "call") {
           const variable = updatedVariables.find(
             (v) => v.name === run.target[0],
@@ -114,7 +198,7 @@ export const useRunner = () => {
             }),
           );
 
-          const result = fnRunner(
+          const result = await fnRunner(
             deepClone(variable.value),
             run.args.map((arg) =>
               deepClone(updatedVariables.find((v) => v.name === arg)?.value),

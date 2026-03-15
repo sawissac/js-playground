@@ -2,7 +2,7 @@
 
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { v4 as uuidv4 } from "uuid";
-import { EditorState, FunctionActionInterface, Runner } from "../types";
+import { CodeSnippetInterface, EditorState, FunctionActionInterface, Runner } from "../types";
 import { DataTypes } from "@/constants/dataTypes";
 
 // Define the initial state for the editor
@@ -11,6 +11,7 @@ const initialState: EditorState = {
   dataTypes: [...DataTypes],
   functions: [],
   runner: [],
+  codeSnippets: [],
 };
 
 export const editorSlice = createSlice({
@@ -205,6 +206,16 @@ export const editorSlice = createSlice({
         type: "call",
         target: ["", ""],
         args: [],
+      });
+    },
+
+    createCodeRunner: (state) => {
+      state.runner.push({
+        id: uuidv4(),
+        type: "code",
+        target: ["", ""],
+        args: [],
+        code: "return @this;\n",
       });
     },
 
@@ -458,6 +469,43 @@ export const editorSlice = createSlice({
       const [movedRunner] = state.runner.splice(fromIndex, 1);
       state.runner.splice(toIndex, 0, movedRunner);
     },
+
+    addCodeSnippet: (
+      state,
+      action: PayloadAction<{ name: string; code: string }>,
+    ) => {
+      const existing = state.codeSnippets.find(
+        (s) => s.name === action.payload.name,
+      );
+      if (existing) {
+        existing.code = action.payload.code;
+      } else {
+        state.codeSnippets.push({
+          id: uuidv4(),
+          name: action.payload.name,
+          code: action.payload.code,
+        });
+      }
+    },
+
+    updateCodeSnippet: (
+      state,
+      action: PayloadAction<{ id: string; snippet: Partial<CodeSnippetInterface> }>,
+    ) => {
+      const idx = state.codeSnippets.findIndex((s) => s.id === action.payload.id);
+      if (idx !== -1) {
+        state.codeSnippets[idx] = {
+          ...state.codeSnippets[idx],
+          ...action.payload.snippet,
+        };
+      }
+    },
+
+    removeCodeSnippet: (state, action: PayloadAction<string>) => {
+      state.codeSnippets = state.codeSnippets.filter(
+        (s) => s.id !== action.payload,
+      );
+    },
   },
 });
 
@@ -485,9 +533,13 @@ export const {
   reorderFunctionActions,
   createSetRunner,
   createCallRunner,
+  createCodeRunner,
   updateRunner,
   removeRunner,
   reorderRunnerSteps,
+  addCodeSnippet,
+  updateCodeSnippet,
+  removeCodeSnippet,
 } = editorSlice.actions;
 
 // Export the reducer

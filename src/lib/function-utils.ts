@@ -1,6 +1,9 @@
 import { FunctionActionInterface } from "@/state/types";
 import { evaluate } from "mathjs";
 
+// AsyncFunction constructor for async code blocks
+const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+
 /**
  * Optimized uniqueIdentifier function that resolves variable references
  * using a pattern-matching approach for better performance
@@ -145,12 +148,68 @@ function unwrapPrimitive(value: any): any {
 
 const CALL_PREFIX = "call:";
 
-export function fnRunner(
+/**
+ * Execute a user-written JavaScript code block with @token context.
+ * Supports async/await and fetch. Returns a Promise.
+ */
+async function executeCodeAction(
+  codeStr: string,
+  args: any[],
+  temp: any,
+  mathTemp: any[],
+  tempVar: any[],
+  stepResults: any[],
+): Promise<any> {
+  if (!codeStr.trim()) return temp;
+
+  // Build token context
+  const tokenCtx: Record<string, any> = {
+    this: temp,
+    t: temp,
+    space: " ",
+    s: " ",
+    comma: ",",
+    c: ",",
+    empty: "",
+    e: "",
+  };
+  args.forEach((a, i) => {
+    tokenCtx[`arg${i + 1}`] = a;
+  });
+  tempVar.forEach((tv, i) => {
+    tokenCtx[`temp${i + 1}`] = tv;
+  });
+  mathTemp.forEach((m, i) => {
+    tokenCtx[`math${i + 1}`] = m;
+  });
+  stepResults.forEach((s, i) => {
+    tokenCtx[`pick(${i + 1})`] = s;
+  });
+
+  // Transform @tokens to context lookups
+  let code = codeStr;
+  code = code.replace(
+    /@(\w+(?:\([^)]*\))?(?:\.\w+)*)/g,
+    (_match, token) => {
+      const dotIdx = token.indexOf(".");
+      if (dotIdx === -1) return `__ctx__["${token}"]`;
+      const base = token.slice(0, dotIdx);
+      const rest = token.slice(dotIdx);
+      return `__ctx__["${base}"]${rest}`;
+    },
+  );
+
+  // eslint-disable-next-line no-new-func
+  const fn = new AsyncFunction("__ctx__", code);
+  return await fn(tokenCtx);
+}
+
+export async function fnRunner(
   payload: any,
   args: any[],
   actions: FunctionActionInterface[],
   allFunctions?: { name: string; actions: FunctionActionInterface[] }[],
-): any {
+): Promise<any> {
   try {
     let temp: any = deepClone(payload);
     const tempVar: any[] = [];
@@ -206,9 +265,9 @@ export function fnRunner(
 
     // Returns { earlyReturn: true, value } when a "return" action is hit,
     // otherwise { earlyReturn: false } after all actions are processed.
-    const processActionList = (
+    const processActionList = async (
       actionList: FunctionActionInterface[],
-    ): { earlyReturn: boolean; value?: any } => {
+    ): Promise<{ earlyReturn: boolean; value?: any }> => {
       for (const action of actionList) {
         // "loop" — iteration block: run sub-actions for each iteration
         if (action.name === "loop") {
@@ -255,7 +314,7 @@ export function fnRunner(
             continue;
           }
 
-          const runSubActions = (iterIndex: number): any => {
+          const runSubActions = async (iterIndex: number): Promise<any> => {
             const currentItem = Array.isArray(temp) ? temp[iterIndex] : iterIndex;
             // When temp is an array, start with the current element so methods
             // like toUpperCase() apply per-element automatically.
@@ -309,6 +368,22 @@ export function fnRunner(
                 continue;
               }
 
+              if (subAction.name === "code") {
+                const codeStr = Array.isArray(subAction.value)
+                  ? (subAction.value[0] ?? "")
+                  : "";
+                subTemp = await executeCodeAction(
+                  codeStr,
+                  args,
+                  subTemp,
+                  mathTemp,
+                  tempVar,
+                  subStepResults,
+                );
+                subStepResults.push(subTemp);
+                continue;
+              }
+
               const subParsed = uniqueIdentifier(
                 subAction.value,
                 args,
@@ -328,7 +403,7 @@ export function fnRunner(
                   (f) => f.name === targetName,
                 );
                 if (targetFunc) {
-                  subTemp = fnRunner(
+                  subTemp = await fnRunner(
                     deepClone(subTemp),
                     subParsed,
                     targetFunc.actions,
@@ -353,7 +428,7 @@ export function fnRunner(
           const results: any[] = [];
           if (step > 0) {
             for (let i = start; i < end; i += step) {
-              const result = runSubActions(i);
+              const result = await runSubActions(i);
               if (result && typeof result === "object" && result.earlyReturn) {
                 return result;
               }
@@ -361,7 +436,7 @@ export function fnRunner(
             }
           } else {
             for (let i = start; i > end; i += step) {
-              const result = runSubActions(i);
+              const result = await runSubActions(i);
               if (result && typeof result === "object" && result.earlyReturn) {
                 return result;
               }
@@ -380,7 +455,7 @@ export function fnRunner(
             ? (action.value[0] ?? "")
             : "";
           if (condExpr && evalCondition(condExpr)) {
-            const sub = processActionList(action.subActions ?? []);
+            const sub = await processActionList(action.subActions ?? []);
             if (sub.earlyReturn) return sub;
           }
           stepResults.push(temp);
@@ -445,6 +520,23 @@ export function fnRunner(
           continue;
         }
 
+        // "code" — execute JavaScript code block (async)
+        if (action.name === "code") {
+          const codeStr = Array.isArray(action.value)
+            ? (action.value[0] ?? "")
+            : "";
+          temp = await executeCodeAction(
+            codeStr,
+            args,
+            temp,
+            mathTemp,
+            tempVar,
+            stepResults,
+          );
+          stepResults.push(temp);
+          continue;
+        }
+
         // cross-function call
         if (action.name.startsWith(CALL_PREFIX)) {
           const targetName = action.name.slice(CALL_PREFIX.length);
@@ -459,7 +551,7 @@ export function fnRunner(
             tempVar,
             stepResults,
           );
-          temp = fnRunner(
+          temp = await fnRunner(
             deepClone(temp),
             parsedArgs,
             targetFunc.actions,
@@ -491,7 +583,7 @@ export function fnRunner(
       return { earlyReturn: false };
     };
 
-    const result = processActionList(actions);
+    const result = await processActionList(actions);
     return result.earlyReturn ? result.value : temp;
   } catch (error: unknown) {
     if (error instanceof Error) {

@@ -9,10 +9,11 @@
 |---|---|
 | Framework | Next.js 15 (App Router) |
 | State | Redux Toolkit |
-| UI | Shadcn UI + Tabler Icons |
+| UI | Shadcn UI + Tabler Icons + Lucide React |
 | Styling | Tailwind CSS |
 | Math | mathjs |
 | UUID | uuid |
+| Visualization | d3 |
 
 ---
 
@@ -26,14 +27,25 @@ Root layout (`src/app/layout.tsx`) loads Geist Sans/Mono fonts and wraps the ent
 Home page. Currently renders a placeholder `<div>Hello</div>`.
 
 #### `/editor` — `src/app/editor/page.tsx`
-Main application page. Uses `ResizablePanelGroup` for a 3-column layout.
+Main application page. Responsive layout with desktop, tablet, and mobile views.
 
-| Panel | Width | Components |
+**Desktop Layout (lg+):** 3-column resizable panel layout
+| Panel | Default Size | Components |
 |---|---|---|
-| Left | 25% | `VariableContainer`, `DataTypeContainer`, `FunctionsContainer` |
-| Middle | 32% | `FunctionDefiner` |
-| Right (top row) | 32% / 50% height | `RunnerDefiner` |
-| Right (bottom row) | 32% / 30% height | `LogContainer` |
+| Left (top) | 22% / 60% height | `VariableContainer`, `DataTypeContainer`, `FunctionsContainer` |
+| Left (bottom) | 22% / 40% height | `CodeSidebar` (code preview) |
+| Center | 40% | `FunctionDefiner` with collapsible panel controls |
+| Right (top) | 38% / 40% height | `RunnerDefiner` |
+| Right (middle) | 38% / 32% height | `CodeDetail` (Objects + FlowChart tabs) |
+| Right (bottom) | 38% / 28% height | `LogContainer` |
+
+**Tablet Layout (md-lg):** 2-column workflow grid
+**Mobile Layout (<md):** Sequential vertical workflow
+
+**Features:**
+- Collapsible left/right panels with toggle buttons
+- Animated panel transitions
+- Persistent panel state during resize
 
 ---
 
@@ -43,6 +55,12 @@ Maps built-in JavaScript method names to their parameter counts.
 - `0` = no params
 - `N` = fixed N params
 - `"n"` = variadic
+
+### `src/constants/dataTypes.ts` — `DataTypes`
+
+```ts
+export const DataTypes = ["string", "array", "number", "boolean", "object"] as const;
+```
 
 ### `src/constants/string.ts` — `StringFunctions`
 
@@ -70,6 +88,32 @@ export const ArrayFunctions = [
   ["lastIndexOf", 1], ["map", 1], ["pop", 0], ["push", "n"],
   ["reverse", 0], ["shift", 0], ["slice", 2], ["some", 1],
   ["sort", 1], ["splice", "n"], ["unshift", "n"], ["values", 0],
+] as const;
+```
+
+### `src/constants/number.ts` — `NumberFunctions`
+
+```ts
+export const NumberFunctions = [
+  ["toFixed", 1], ["toExponential", 1], ["toPrecision", 1],
+  ["toString", 1], ["valueOf", 0],
+] as const;
+```
+
+### `src/constants/boolean.ts` — `BooleanFunctions`
+
+```ts
+export const BooleanFunctions = [
+  ["toString", 0], ["valueOf", 0],
+] as const;
+```
+
+### `src/constants/object.ts` — `ObjectFunctions`
+
+```ts
+export const ObjectFunctions = [
+  ["keys", 0], ["values", 0], ["entries", 0], ["assign", "n"],
+  ["freeze", 0], ["hasOwn", 1], ["fromEntries", 1],
 ] as const;
 ```
 
@@ -138,6 +182,9 @@ Define ordered method-chain actions for each function.
 | `temp` | Store a value in a temporary slot (accessed via `@temp1`, `@temp2`, ...) |
 | `return` | Return a specific resolved value from the function |
 | `use` | Switch the current working value to a resolved reference |
+| `when` | Conditional execution — evaluates condition, runs sub-actions if true |
+| `loop` | Iteration block — runs sub-actions for range (start..end, step) |
+| `call:functionName` | Call another user-defined function by name |
 
 **Dispatches:** `addFunctionAction`, `updateFunctionAction`, `removeFunctionAction`
 
@@ -165,7 +212,7 @@ Compose an ordered list of steps that set variables or call functions, then exec
 
 ### `LogContainer` — `src/features/log-container/index.tsx`
 
-Display execution output and messages.
+Display execution output and messages with enhanced context tracking.
 
 **Behaviors:**
 - Three filter tabs: Error (red), Warning (yellow), Info (blue)
@@ -173,8 +220,57 @@ Display execution output and messages.
 - Clear all logs button
 - Sticky header with filters
 - Dark `slate-800` background
+- Auto-scroll to bottom on new logs
+
+**Enhanced Log Display:**
+- **Timestamps:** Shows elapsed time (+Xms or +Xs) from first log
+- **Context badges:** Visual indicators for log source (runner, error, step, function)
+- **Color coding:** Icons and text colored by context type
+- **Animations:** Smooth fade-in and slide-in transitions
 
 **Dispatches:** `clearLogs`
+
+---
+
+### `CodeSidebar` — `src/features/code-sidebar/index.tsx`
+
+Real-time JavaScript-like code preview of variables, functions, and runner steps.
+
+**Behaviors:**
+- Syntax-highlighted preview with custom color scheme
+- Displays variables with type annotations and values
+- Shows function definitions with nested actions
+- Renders control flow blocks (when, loop) with proper indentation
+- Runner steps shown as assignment or function call notation
+- Empty state: `// empty` placeholder
+
+**Rendering Features:**
+- Type-specific colors (string: green, number: blue, boolean: purple, array: orange, object: yellow)
+- Special action highlighting (math: purple, temp: yellow, return: green, use: cyan)
+- Nested sub-actions indented within control flow blocks
+- Value formatting based on data type
+
+---
+
+### `CodeDetail` — `src/features/code-detail/index.tsx`
+
+Tabbed visualization panel with Objects inspector and FlowChart diagram.
+
+**Tabs:**
+| Tab | Icon | Purpose |
+|---|---|---|
+| Objects | box icon | JSON tree view of variables and their values |
+| FlowChart | workflow icon | D3-powered visual flow diagram of function execution |
+
+**Objects Tab:**
+- Displays all variables with type and value in JSON format
+- Empty state message when no variables exist
+
+**FlowChart Tab:**
+- Visual diagram of selected function's action flow
+- Function selector dropdown
+- D3.js rendering (implementation pending)
+- Empty state message when no functions exist
 
 ---
 
@@ -245,16 +341,20 @@ Resolves special `@`-prefixed reference tokens in action parameter arrays.
 | `@temp1`, `@temp2`, ... | Nth stored temp variable |
 | `@pick(1)`, `@pick(2)`, ... | Nth step result from function execution (1-indexed) |
 | `@this` / `@t` | Current working value (`temp`) |
+| `@this.property` | Property access on current value (e.g., `@this.length`, `@this.name`) |
+| `@arg1.property` | Property access on arguments (e.g., `@arg1.email`) |
 | `@space` / `@s` | Space character `" "` |
 | `@comma` / `@c` | Comma character `","` |
 | `@empty` / `@e` | Empty string `""` |
+
+**Property Access:** Tokens support dot notation for nested property access (e.g., `@this.user.name`, `@arg1.address.city`)
 
 ---
 
 ### `fnRunner` — `src/lib/function-utils.ts`
 
 ```ts
-fnRunner(payload: any, args: any[], actions: FunctionActionInterface[]): any
+fnRunner(payload: any, args: any[], actions: FunctionActionInterface[], allFunctions?: FunctionInterface[]): any
 ```
 
 Core execution engine. Processes actions sequentially, maintaining:
@@ -269,9 +369,32 @@ Core execution engine. Processes actions sequentially, maintaining:
 | Function call | `typeof temp[action.name] === 'function'` and not a magic action | Calls `temp[name](...resolvedArgs)`, sets `temp` to result |
 | `math` | `action.name === 'math'` | Evaluates expression via `mathjs.evaluate()`, pushes to `mathTemp`, `temp` unchanged |
 | `temp` | `action.name === 'temp'` | Pushes resolved value to `tempVar`, `temp` unchanged |
-| `return` | `action.name === 'return'` | Sets `temp` to first resolved value |
+| `when` | `action.name === 'when'` | Evaluates condition string; if true, recursively processes `subActions` |
+| `loop` | `action.name === 'loop'` | Iterates from `start` to `end` by `step`; runs `subActions` each iteration |
+| `call:*` | `action.name.startsWith('call:')` | Calls user-defined function by name; passes args and current `temp` |
+| `return` | `action.name === 'return'` | Sets `temp` to first resolved value; stops processing |
 | `use` | `action.name === 'use'` | Sets `temp` to first resolved value (switches working context) |
 | Property access | default fallback | Sets `temp` to `temp[action.name]` |
+
+**Control Flow Details:**
+
+**`when` (Conditional):**
+- Evaluates condition string with `@token` resolution
+- Bare string literals automatically quoted for safety (e.g., `@this == hello` → `"value" == "hello"`)
+- JavaScript expressions supported (e.g., `@this > 5`, `@arg1.length === 3`)
+- Sub-actions only execute if condition evaluates to `true`
+
+**`loop` (Iteration):**
+- Parameters: `start` (default: 0), `end` (default: `@this.length`), `step` (default: 1)
+- Supports `@token` references in parameters
+- Sub-actions executed for each iteration
+- Can access loop counter and iterate over arrays
+
+**`call:*` (Function Calls):**
+- Syntax: `call:functionName` where `functionName` matches a user-defined function
+- Passes arguments via `value` array (supports `@tokens`)
+- Returns result of called function
+- Supports recursive and nested function calls
 
 **Error handling:** Wraps all errors as `"Function execution error: <message>"`.
 
@@ -299,10 +422,16 @@ interface VariableInterface {
 }
 
 interface FunctionActionInterface {
-  id: string;       // uuid
-  name: string;     // method name or magic action
-  dataType: string; // 'string' | 'array'
-  value: any;       // string[] — may contain @tokens
+  id: string;                    // uuid
+  name: string;                  // method name or magic action
+  dataType: string;              // 'string' | 'array' | 'number' | 'boolean' | 'object'
+  value: any;                    // string[] — may contain @tokens
+  subActions?: FunctionActionInterface[]; // for "when" conditional blocks and "loop" iterations
+  loopParams?: {                 // for "loop" action parameters
+    start?: string;              // loop start value (default: 0)
+    end?: string;                // loop end value (default: @this.length)
+    step?: string;               // loop step increment (default: 1)
+  };
 }
 
 interface FunctionInterface {
@@ -326,8 +455,15 @@ interface EditorState {
   runner: Runner[];
 }
 
+interface LogEntry {
+  type: 'error' | 'warning' | 'info';
+  message: string;
+  timestamp: number;             // millisecond timestamp
+  context?: string;              // e.g. function name or step label
+}
+
 interface LogState {
-  logs: { type: 'error' | 'warning' | 'info'; message: string }[];
+  logs: LogEntry[];
 }
 ```
 
@@ -335,7 +471,11 @@ interface LogState {
 
 ### `editorSlice` — `src/state/slices/editorSlice.ts`
 
-**Initial state:** `{ variables: [], dataTypes: ['string', 'array', 'number', 'boolean'], functions: [], runner: [] }`
+**Initial state:** `{ variables: [], dataTypes: ['string', 'array', 'number', 'boolean', 'object'], functions: [], runner: [] }`
+
+**Note:** When creating a new function, it automatically initializes with two default actions:
+1. `temp` action storing `@arg1`
+2. `use` action switching to `@temp1`
 
 **Variable actions:**
 | Action | Payload | Behavior |
@@ -356,6 +496,19 @@ interface LogState {
 | `addFunctionAction` | `{ functionId, action }` | Push action with new uuid |
 | `updateFunctionAction` | `{ functionId, actionId, action }` | Update action; also syncs `func.dataType` from last action |
 | `removeFunctionAction` | `{ functionId, actionId }` | Remove action |
+| `reorderFunctionActions` | `{ functionId, fromIndex, toIndex }` | Reorder actions via drag-and-drop |
+
+**Control Flow actions:**
+| Action | Payload | Behavior |
+|---|---|---|
+| `addWhenSubAction` | `{ functionId, whenActionId, subAction }` | Add sub-action to "when" block |
+| `removeWhenSubAction` | `{ functionId, whenActionId, subActionId }` | Remove sub-action from "when" block |
+| `updateWhenSubAction` | `{ functionId, whenActionId, subActionId, subAction }` | Update sub-action in "when" block |
+| `reorderWhenSubActions` | `{ functionId, whenActionId, fromIndex, toIndex }` | Reorder "when" sub-actions |
+| `addLoopSubAction` | `{ functionId, loopActionId, subAction }` | Add sub-action to "loop" block |
+| `removeLoopSubAction` | `{ functionId, loopActionId, subActionId }` | Remove sub-action from "loop" block |
+| `updateLoopSubAction` | `{ functionId, loopActionId, subActionId, subAction }` | Update sub-action in "loop" block |
+| `updateLoopParams` | `{ functionId, loopActionId, loopParams }` | Update loop parameters (start, end, step) |
 
 **Runner actions:**
 | Action | Payload | Behavior |
@@ -364,6 +517,7 @@ interface LogState {
 | `createCallRunner` | void | Push `{ type: 'call', target: ['',''], args: [] }` |
 | `updateRunner` | `{ runnerId, runner }` | Replace runner by id |
 | `removeRunner` | `string` (id) | Filter by id |
+| `reorderRunnerSteps` | `{ fromIndex, toIndex }` | Reorder runner steps via drag-and-drop |
 
 ---
 
@@ -373,7 +527,7 @@ interface LogState {
 
 | Action | Payload | Behavior |
 |---|---|---|
-| `addLog` | `{ type, message }` | Push new log entry |
+| `addLog` | `{ type, message, context? }` | Push new log entry with timestamp |
 | `clearLogs` | void | Empty logs array |
 | `removeLog` | `number` (index) | Remove log by index |
 
@@ -428,4 +582,14 @@ Logs: info: "Setting variable myString to hello"
 
 **Debouncing:** `FunctionDefiner` and `RunnerDefiner` debounce input changes at 300ms to avoid flooding Redux with dispatches on every keystroke.
 
+**UUID Keys:** All entities (variables, functions, actions, runners) use UUID v4 for unique identification. React components render using UUID keys for optimal performance.
+
 **Keyboard shortcuts:** `VariableContainer` — `Alt/Cmd/Ctrl+1` to focus, `Alt/Cmd/Ctrl+E` to submit. `FunctionsContainer` — `Alt/Cmd/Ctrl+3` to focus.
+
+**Data Type Support:** The playground supports 5 primitive types: `string`, `array`, `number`, `boolean`, and `object`. Each type has its own set of native JavaScript methods available.
+
+**Control Flow:** Functions support conditional execution (`when`) and iteration (`loop`) with nested sub-actions, enabling complex logic without writing actual JavaScript code.
+
+**Function Composition:** Functions can call other user-defined functions via `call:functionName` actions, enabling modular and reusable function design.
+
+**Deep Cloning:** Runner execution deep-clones variable values before function processing to prevent unintended mutations and ensure predictable behavior.

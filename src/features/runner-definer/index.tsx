@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   IconArrowLeftSquareFilled,
   IconArrowsDown,
+  IconCode,
   IconEqual,
   IconGripVertical,
   IconInfoCircle,
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/popover";
 import {
   createCallRunner,
+  createCodeRunner,
   createSetRunner,
   removeRunner,
   reorderRunnerSteps,
@@ -38,6 +40,18 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useRunner } from "@/hooks/useRunner";
+import { CodeEditor } from "@/components/code-editor";
+
+const CODE_TOKENS: { token: string; desc: string }[] = [
+  { token: "@this", desc: "target variable's current value" },
+  { token: "@t", desc: "current value (short)" },
+  { token: "@space", desc: 'space character " "' },
+  { token: "@s", desc: "space (short)" },
+  { token: "@comma", desc: 'comma character ","' },
+  { token: "@c", desc: "comma (short)" },
+  { token: "@empty", desc: 'empty string ""' },
+  { token: "@e", desc: "empty (short)" },
+];
 
 const InstructionPanel = () => {
   return (
@@ -67,6 +81,10 @@ const InstructionPanel = () => {
             <li>
               <IconSquareFilled size={9} className="inline mr-1" />
               <strong>Call Function</strong> — run a function on a variable
+            </li>
+            <li>
+              <IconCode size={9} className="inline mr-1" />
+              <strong>Code</strong> — run JavaScript with @token access
             </li>
           </ul>
           <p className="text-blue-700">
@@ -101,6 +119,7 @@ const RunnerInput = (payload: {
   const functions = useAppSelector((state) => state.editor.functions);
   const [value, setValue] = useState<string>("");
   const [args, setArgs] = useState<string>("");
+  const [code, setCode] = useState<string>(payload.runner.code ?? "return @this;\n");
   const [showArgSuggestions, setShowArgSuggestions] = useState(false);
   const argsInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -130,7 +149,23 @@ const RunnerInput = (payload: {
   };
 
   const debouncedUpdateRunner = useDebounce(handleUpdateRunner, 300);
+
+  const handleUpdateCodeRunner = (
+    runnerId: string,
+    target: [string, string],
+    codeVal: string,
+  ) => {
+    dispatch(
+      updateRunner({
+        runnerId,
+        runner: { ...payload.runner, target, args: [], code: codeVal },
+      }),
+    );
+  };
+  const debouncedUpdateCode = useDebounce(handleUpdateCodeRunner, 300);
+
   const isSet = runnerType === "set";
+  const isCode = runnerType === "code";
 
   const insertArgVar = (varName: string) => {
     const current = argsInputRef.current?.value ?? args;
@@ -180,10 +215,12 @@ const RunnerInput = (payload: {
           <Badge variant="secondary" className="gap-1 text-xs py-0">
             {isSet ? (
               <IconTriangleFilled size={9} />
+            ) : isCode ? (
+              <IconCode size={9} />
             ) : (
               <IconSquareFilled size={9} />
             )}
-            {isSet ? "Set" : "Call"}
+            {isSet ? "Set" : isCode ? "Code" : "Call"}
           </Badge>
           <Button
             variant="destructive"
@@ -196,101 +233,177 @@ const RunnerInput = (payload: {
         </div>
 
         {/* Fields */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <Select
-            value={runnerTarget[0]}
-            onValueChange={(v) =>
-              debouncedUpdateRunner(
-                payload.runner.id,
-                [v, runnerTarget[1]],
-                runnerArgs,
-              )
-            }
-          >
-            <SelectTrigger className="w-[120px] h-7 text-xs">
-              <SelectValue placeholder="variable" />
-            </SelectTrigger>
-            <SelectContent>
-              {variables.map((v) => (
-                <SelectItem key={v.id} value={v.name} className="text-xs">
-                  {v.name}
-                  {v.type && (
-                    <span className="text-muted-foreground ml-1">
-                      :{v.type}
-                    </span>
-                  )}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {isSet ? (
-            <div className="flex items-center gap-1 flex-1 min-w-[80px]">
-              <IconEqual size={12} className="shrink-0 text-muted-foreground" />
-              <Input
-                value={value}
-                placeholder="value"
-                className="h-7 text-xs"
-                onChange={(e) => {
-                  setValue(e.target.value);
-                  debouncedUpdateRunner(
-                    payload.runner.id,
-                    [runnerTarget[0], e.target.value],
-                    runnerArgs,
-                  );
-                }}
-              />
+        {isCode ? (
+          <>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Select
+                value={runnerTarget[0]}
+                onValueChange={(v) =>
+                  debouncedUpdateCode(payload.runner.id, [v, ""], code)
+                }
+              >
+                <SelectTrigger className="w-[120px] h-7 text-xs">
+                  <SelectValue placeholder="variable" />
+                </SelectTrigger>
+                <SelectContent>
+                  {variables.map((v) => (
+                    <SelectItem key={v.id} value={v.name} className="text-xs">
+                      {v.name}
+                      {v.type && (
+                        <span className="text-muted-foreground ml-1">
+                          :{v.type}
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-[10px] text-muted-foreground">
+                ← code result
+              </span>
             </div>
-          ) : (
-            <>
-              <div className="flex items-center gap-1 flex-1">
-                <IconArrowLeftSquareFilled
+
+            <CodeEditor
+              value={code}
+              onChange={(newCode) => {
+                setCode(newCode);
+                debouncedUpdateCode(
+                  payload.runner.id,
+                  [runnerTarget[0], ""],
+                  newCode,
+                );
+              }}
+              tokens={CODE_TOKENS}
+              variables={variables.map((v) => ({
+                name: v.name,
+                type: v.type,
+              }))}
+            />
+
+            <div className="rounded bg-slate-50 border border-slate-200 px-2 py-1.5 text-xs space-y-1">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                @ tokens — available in code
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {CODE_TOKENS.map((t) => (
+                  <span
+                    key={t.token}
+                    className="font-mono text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5"
+                    title={t.desc}
+                  >
+                    {t.token}
+                  </span>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Variables accessible by name. Press{" "}
+                <kbd className="bg-slate-200 px-1 rounded text-[9px]">
+                  ⌘ Space
+                </kbd>{" "}
+                for autocomplete.
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Select
+              value={runnerTarget[0]}
+              onValueChange={(v) =>
+                debouncedUpdateRunner(
+                  payload.runner.id,
+                  [v, runnerTarget[1]],
+                  runnerArgs,
+                )
+              }
+            >
+              <SelectTrigger className="w-[120px] h-7 text-xs">
+                <SelectValue placeholder="variable" />
+              </SelectTrigger>
+              <SelectContent>
+                {variables.map((v) => (
+                  <SelectItem key={v.id} value={v.name} className="text-xs">
+                    {v.name}
+                    {v.type && (
+                      <span className="text-muted-foreground ml-1">
+                        :{v.type}
+                      </span>
+                    )}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {isSet ? (
+              <div className="flex items-center gap-1 flex-1 min-w-[80px]">
+                <IconEqual
                   size={12}
                   className="shrink-0 text-muted-foreground"
                 />
-                <Select
-                  value={runnerTarget[1]}
-                  onValueChange={(v) =>
+                <Input
+                  value={value}
+                  placeholder="value"
+                  className="h-7 text-xs"
+                  onChange={(e) => {
+                    setValue(e.target.value);
                     debouncedUpdateRunner(
                       payload.runner.id,
-                      [runnerTarget[0], v],
+                      [runnerTarget[0], e.target.value],
                       runnerArgs,
-                    )
-                  }
-                >
-                  <SelectTrigger className="h-7 text-xs w-full">
-                    <SelectValue placeholder="function" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {funcList.map((fn, i) => (
-                      <SelectItem key={i} value={fn} className="text-xs">
-                        {fn}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    );
+                  }}
+                />
               </div>
-              <Input
-                ref={argsInputRef}
-                placeholder="args (variables)"
-                className="h-7 text-xs flex-1 min-w-[70px]"
-                value={args}
-                onFocus={() => setShowArgSuggestions(true)}
-                onBlur={() =>
-                  setTimeout(() => setShowArgSuggestions(false), 150)
-                }
-                onChange={(e) => {
-                  setArgs(e.target.value);
-                  debouncedUpdateRunner(
-                    payload.runner.id,
-                    [runnerTarget[0], runnerTarget[1]],
-                    e.target.value.split(",").map((v) => v.trim()),
-                  );
-                }}
-              />
-            </>
-          )}
-        </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-1 flex-1">
+                  <IconArrowLeftSquareFilled
+                    size={12}
+                    className="shrink-0 text-muted-foreground"
+                  />
+                  <Select
+                    value={runnerTarget[1]}
+                    onValueChange={(v) =>
+                      debouncedUpdateRunner(
+                        payload.runner.id,
+                        [runnerTarget[0], v],
+                        runnerArgs,
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-7 text-xs w-full">
+                      <SelectValue placeholder="function" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {funcList.map((fn, i) => (
+                        <SelectItem key={i} value={fn} className="text-xs">
+                          {fn}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Input
+                  ref={argsInputRef}
+                  placeholder="args (variables)"
+                  className="h-7 text-xs flex-1 min-w-[70px]"
+                  value={args}
+                  onFocus={() => setShowArgSuggestions(true)}
+                  onBlur={() =>
+                    setTimeout(() => setShowArgSuggestions(false), 150)
+                  }
+                  onChange={(e) => {
+                    setArgs(e.target.value);
+                    debouncedUpdateRunner(
+                      payload.runner.id,
+                      [runnerTarget[0], runnerTarget[1]],
+                      e.target.value.split(",").map((v) => v.trim()),
+                    );
+                  }}
+                />
+              </>
+            )}
+          </div>
+        )}
 
         {/* Set hint: show variable type and expected format */}
         {isSet && varType && (
@@ -305,7 +418,7 @@ const RunnerInput = (payload: {
         )}
 
         {/* Call args: variable name chips */}
-        {!isSet && showArgSuggestions && variables.length > 0 && (
+        {!isSet && !isCode && showArgSuggestions && variables.length > 0 && (
           <div className="rounded bg-slate-50 border border-slate-200 p-2 text-xs space-y-1">
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
               variables
@@ -348,7 +461,11 @@ const RunnerDefiner = () => {
 
   const allTyped = variables.length > 0 && variables.every((v) => v.type);
   const runDisabled =
-    !runner.length || !runner.every((r) => r.target[0] && r.target[1]);
+    !runner.length ||
+    !runner.every((r) => {
+      if (r.type === "code") return !!r.target[0];
+      return r.target[0] && r.target[1];
+    });
 
   const handleDragStart = (index: number) => {
     setDragState({ dragIndex: index, dragOverIndex: null });
@@ -418,6 +535,20 @@ const RunnerDefiner = () => {
         >
           <IconSquareFilled size={12} />
           Call Function
+        </Button>
+        <Button
+          variant="outline"
+          className="flex-1 h-7 text-xs gap-1"
+          disabled={!allTyped}
+          onClick={() => dispatch(createCodeRunner())}
+          title={
+            !allTyped
+              ? "All variables need a type first"
+              : "Add a Code block step"
+          }
+        >
+          <IconCode size={12} />
+          Code
         </Button>
         <Button
           variant="default"

@@ -1,5 +1,6 @@
 "use client";
 
+import { CodeEditor } from "@/components/code-editor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ import {
   removeLoopSubAction,
   updateLoopSubAction,
   updateLoopParams,
+  addCodeSnippet,
 } from "@/state/slices/editorSlice";
 import { FunctionActionInterface } from "@/state/types";
 import {
@@ -272,6 +274,10 @@ const METHOD_DESCRIPTIONS: Record<string, { desc: string; params: string[] }> =
       desc: "Iterates from start to end by step, running process actions on each iteration. Sub-actions start with the full current value (@this = whole array/value). Use 'use @this' as the first sub-action to switch context to the current element — after that, all chained actions operate on that element. Without 'use @this', methods like join or reverse run on the whole collection each iteration. Returns an array collecting the final result of each iteration.",
       params: ["start", "end", "step"],
     },
+    code: {
+      desc: "Execute JavaScript code with @token access. The return value becomes the new working value. All @tokens (@this, @arg1, @temp1, @math1, @pick(1), @space, @comma, @empty) are available.",
+      params: ["code"],
+    },
   };
 
 // ─── @ token helpers ──────────────────────────────────────────────────────────
@@ -495,7 +501,7 @@ function serializeConditionRows(rows: ConditionRow[]): string {
 
 // ─── Method selector ──────────────────────────────────────────────────────────
 
-const MAGIC_NAMES = ["math", "temp", "return", "use"] as const;
+const MAGIC_NAMES = ["math", "temp", "return", "use", "code"] as const;
 type MagicName = (typeof MAGIC_NAMES)[number];
 
 const MAGIC_INDICATORS: Record<
@@ -521,6 +527,11 @@ const MAGIC_INDICATORS: Record<
     dot: "bg-sky-400",
     badge: "border-sky-200 bg-sky-50 text-sky-700",
     label: "switch",
+  },
+  code: {
+    dot: "bg-teal-400",
+    badge: "border-teal-200 bg-teal-50 text-teal-700",
+    label: "code",
   },
 };
 
@@ -1235,6 +1246,16 @@ const WhenSubActionRow = ({
   const subActionName = (subAction?.name ?? "") as string;
   const subActionDataType = (subAction?.dataType ?? "") as string;
   const subActionValue = (subAction?.value?.join(",") ?? "") as string;
+  const subActionCodeName = subAction?.codeName ?? "";
+
+  const codeSnippets = useAppSelector((state) => state.editor.codeSnippets);
+  const [codeName, setCodeName] = React.useState(subActionCodeName);
+  const codeNameRef = React.useRef(subActionCodeName);
+
+  React.useEffect(() => {
+    setCodeName(subActionCodeName);
+    codeNameRef.current = subActionCodeName;
+  }, [subActionCodeName]);
 
   // Don't sync from Redux while the user is actively typing — it trims trailing
   // spaces mid-keystroke and causes characters to be dropped.
@@ -1280,6 +1301,7 @@ const WhenSubActionRow = ({
       { name: "temp", params: 1 },
       { name: "return", params: 1 },
       { name: "use", params: 1 },
+      { name: "code", params: "n" },
     ];
     const callEntries = callableFunctions.map((fn) => ({
       name: `${CALL_PREFIX}${fn.name}`,
@@ -1330,8 +1352,9 @@ const WhenSubActionRow = ({
           id: subActionId,
           name: actionName,
           dataType: actionDataType,
+          codeName: codeNameRef.current || undefined,
           value:
-            actionName === "if"
+            actionName === "if" || actionName === "code"
               ? [actionValue]
               : actionValue.split(",").map((v) => v.trim()),
         },
@@ -1339,6 +1362,35 @@ const WhenSubActionRow = ({
     );
   };
   const dispatchUpdate = useDebounce(dispatchUpdateImpl, 300);
+
+  const handleCodeNameChange = (name: string) => {
+    setCodeName(name);
+    codeNameRef.current = name;
+    dispatchUpdateImpl({
+      actionName: subActionName,
+      actionDataType: subActionDataType,
+      actionValue: subActionValue,
+    });
+  };
+
+  const handleSaveSnippet = () => {
+    const name = codeNameRef.current.trim();
+    if (!name || !value.trim()) return;
+    dispatch(addCodeSnippet({ name, code: value }));
+  };
+
+  const handleLoadSnippet = (snippetId: string) => {
+    const snippet = codeSnippets.find((s) => s.id === snippetId);
+    if (!snippet) return;
+    setCodeName(snippet.name);
+    codeNameRef.current = snippet.name;
+    setValue(snippet.code);
+    dispatchUpdateImpl({
+      actionName: "code",
+      actionDataType: subActionDataType,
+      actionValue: snippet.code,
+    });
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -1441,7 +1493,7 @@ const WhenSubActionRow = ({
           }
         />
 
-        {paramsCount !== 0 && subActionName !== "if" && (
+        {paramsCount !== 0 && subActionName !== "if" && subActionName !== "code" && (
           <Input
             ref={inputRef}
             className="flex-1 min-w-[80px] h-7 text-xs"
@@ -1465,6 +1517,55 @@ const WhenSubActionRow = ({
         )}
       </div>
 
+      {subActionName === "code" && (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <Input
+              className="flex-1 h-7 text-xs"
+              placeholder="code name (e.g. formatDate)"
+              value={codeName}
+              onChange={(e) => handleCodeNameChange(e.target.value)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2 shrink-0 border-teal-300 text-teal-700 hover:bg-teal-50"
+              disabled={!codeName.trim() || !value.trim()}
+              onClick={handleSaveSnippet}
+            >
+              Save
+            </Button>
+            {codeSnippets.length > 0 && (
+              <Select onValueChange={handleLoadSnippet}>
+                <SelectTrigger className="w-[120px] h-7 text-xs shrink-0">
+                  <SelectValue placeholder="Load snippet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {codeSnippets.map((s) => (
+                    <SelectItem key={s.id} value={s.id} className="text-xs">
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <CodeEditor
+            value={value}
+            onChange={(newCode) => {
+              setValue(newCode);
+              dispatchUpdate({
+                actionName: "code",
+                actionDataType: subActionDataType,
+                actionValue: newCode,
+              });
+            }}
+            tokens={atTokens}
+            variables={[]}
+          />
+        </div>
+      )}
+
       {subActionName === "if" && (
         <IfConditionBuilder
           value={value}
@@ -1480,7 +1581,7 @@ const WhenSubActionRow = ({
         />
       )}
 
-      {subActionName !== "if" && (
+      {subActionName !== "if" && subActionName !== "code" && (
         <SuggestionPanel
           dataType={subActionDataType}
           methodName={subActionName}
@@ -1538,6 +1639,16 @@ const LoopSubActionRow = ({
   const subActionName = (subAction?.name ?? "") as string;
   const subActionDataType = (subAction?.dataType ?? "") as string;
   const subActionValue = (subAction?.value?.join(",") ?? "") as string;
+  const subActionCodeName = subAction?.codeName ?? "";
+
+  const codeSnippets = useAppSelector((state) => state.editor.codeSnippets);
+  const [codeName, setCodeName] = React.useState(subActionCodeName);
+  const codeNameRef = React.useRef(subActionCodeName);
+
+  React.useEffect(() => {
+    setCodeName(subActionCodeName);
+    codeNameRef.current = subActionCodeName;
+  }, [subActionCodeName]);
 
   React.useEffect(() => {
     if (!inputFocusedRef.current) setValue(subActionValue);
@@ -1581,6 +1692,7 @@ const LoopSubActionRow = ({
       { name: "temp", params: 1 },
       { name: "return", params: 1 },
       { name: "use", params: 1 },
+      { name: "code", params: "n" },
     ];
     const callEntries = callableFunctions.map((fn) => ({
       name: `${CALL_PREFIX}${fn.name}`,
@@ -1632,8 +1744,9 @@ const LoopSubActionRow = ({
           id: subActionId,
           name: actionName,
           dataType: actionDataType,
+          codeName: codeNameRef.current || undefined,
           value:
-            actionName === "if"
+            actionName === "if" || actionName === "code"
               ? [actionValue]
               : actionValue.split(",").map((v) => v.trim()),
         },
@@ -1641,6 +1754,35 @@ const LoopSubActionRow = ({
     );
   };
   const dispatchUpdate = useDebounce(dispatchUpdateImpl, 300);
+
+  const handleCodeNameChange = (name: string) => {
+    setCodeName(name);
+    codeNameRef.current = name;
+    dispatchUpdateImpl({
+      actionName: subActionName,
+      actionDataType: subActionDataType,
+      actionValue: subActionValue,
+    });
+  };
+
+  const handleSaveSnippet = () => {
+    const name = codeNameRef.current.trim();
+    if (!name || !value.trim()) return;
+    dispatch(addCodeSnippet({ name, code: value }));
+  };
+
+  const handleLoadSnippet = (snippetId: string) => {
+    const snippet = codeSnippets.find((s) => s.id === snippetId);
+    if (!snippet) return;
+    setCodeName(snippet.name);
+    codeNameRef.current = snippet.name;
+    setValue(snippet.code);
+    dispatchUpdateImpl({
+      actionName: "code",
+      actionDataType: subActionDataType,
+      actionValue: snippet.code,
+    });
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -1743,7 +1885,7 @@ const LoopSubActionRow = ({
           }
         />
 
-        {paramsCount !== 0 && subActionName !== "if" && (
+        {paramsCount !== 0 && subActionName !== "if" && subActionName !== "code" && (
           <Input
             ref={inputRef}
             className="flex-1 min-w-[80px] h-7 text-xs"
@@ -1767,6 +1909,55 @@ const LoopSubActionRow = ({
         )}
       </div>
 
+      {subActionName === "code" && (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <Input
+              className="flex-1 h-7 text-xs"
+              placeholder="code name (e.g. formatDate)"
+              value={codeName}
+              onChange={(e) => handleCodeNameChange(e.target.value)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2 shrink-0 border-teal-300 text-teal-700 hover:bg-teal-50"
+              disabled={!codeName.trim() || !value.trim()}
+              onClick={handleSaveSnippet}
+            >
+              Save
+            </Button>
+            {codeSnippets.length > 0 && (
+              <Select onValueChange={handleLoadSnippet}>
+                <SelectTrigger className="w-[120px] h-7 text-xs shrink-0">
+                  <SelectValue placeholder="Load snippet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {codeSnippets.map((s) => (
+                    <SelectItem key={s.id} value={s.id} className="text-xs">
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <CodeEditor
+            value={value}
+            onChange={(newCode) => {
+              setValue(newCode);
+              dispatchUpdate({
+                actionName: "code",
+                actionDataType: subActionDataType,
+                actionValue: newCode,
+              });
+            }}
+            tokens={atTokens}
+            variables={[]}
+          />
+        </div>
+      )}
+
       {subActionName === "if" && (
         <IfConditionBuilder
           value={value}
@@ -1782,7 +1973,7 @@ const LoopSubActionRow = ({
         />
       )}
 
-      {subActionName !== "if" && (
+      {subActionName !== "if" && subActionName !== "code" && (
         <SuggestionPanel
           dataType={subActionDataType}
           methodName={subActionName}
@@ -2119,6 +2310,21 @@ const FunctionActionInput = (payload: {
       ?.value?.join(",") ?? "") as string;
   }, [functions, payload.functionId, payload.actionId]);
 
+  const funcCodeName = React.useMemo(() => {
+    return functions
+      .find((fn) => fn.id === payload.functionId)
+      ?.actions.find((a) => a.id === payload.actionId)?.codeName ?? "";
+  }, [functions, payload.functionId, payload.actionId]);
+
+  const codeSnippets = useAppSelector((state) => state.editor.codeSnippets);
+  const [codeName, setCodeName] = React.useState(funcCodeName);
+  const codeNameRef = React.useRef(funcCodeName);
+
+  React.useEffect(() => {
+    setCodeName(funcCodeName);
+    codeNameRef.current = funcCodeName;
+  }, [funcCodeName]);
+
   // Don't sync from Redux while the user is actively typing — it trims trailing
   // spaces mid-keystroke and causes characters to be dropped.
   React.useEffect(() => {
@@ -2157,6 +2363,7 @@ const FunctionActionInput = (payload: {
       { name: "temp", params: 1 },
       { name: "return", params: 1 },
       { name: "use", params: 1 },
+      { name: "code", params: "n" },
     ];
     const callEntries: { name: string | number; params: string | number }[] =
       callableFunctions.map((fn) => ({
@@ -2215,10 +2422,12 @@ const FunctionActionInput = (payload: {
           id: payload.actionId,
           name: actionName,
           dataType: actionDataType,
+          codeName: codeNameRef.current || undefined,
           value:
             actionName === "if" ||
             actionName === "when" ||
-            actionName === "loop"
+            actionName === "loop" ||
+            actionName === "code"
               ? [actionValue]
               : actionValue.split(",").map((v) => v.trim()),
         },
@@ -2227,6 +2436,35 @@ const FunctionActionInput = (payload: {
   };
 
   const handleDatatype = useDebounce(handleDatatypeImpl, 300);
+
+  const handleCodeNameChange = (name: string) => {
+    setCodeName(name);
+    codeNameRef.current = name;
+    handleDatatypeImpl({
+      actionName: funcName,
+      actionDataType: funcDataType,
+      actionValue: funcValue,
+    });
+  };
+
+  const handleSaveSnippet = () => {
+    const name = codeNameRef.current.trim();
+    if (!name || !value.trim()) return;
+    dispatch(addCodeSnippet({ name, code: value }));
+  };
+
+  const handleLoadSnippet = (snippetId: string) => {
+    const snippet = codeSnippets.find((s) => s.id === snippetId);
+    if (!snippet) return;
+    setCodeName(snippet.name);
+    codeNameRef.current = snippet.name;
+    setValue(snippet.code);
+    handleDatatypeImpl({
+      actionName: "code",
+      actionDataType: funcDataType,
+      actionValue: snippet.code,
+    });
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -2355,7 +2593,8 @@ const FunctionActionInput = (payload: {
         {paramsCount !== 0 &&
           funcName !== "if" &&
           funcName !== "when" &&
-          funcName !== "loop" && (
+          funcName !== "loop" &&
+          funcName !== "code" && (
             <Input
               ref={inputRef}
               className={cn(
@@ -2381,6 +2620,56 @@ const FunctionActionInput = (payload: {
             />
           )}
       </div>
+
+      {/* Code editor block */}
+      {funcName === "code" && (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <Input
+              className="flex-1 h-7 text-xs"
+              placeholder="code name (e.g. formatDate)"
+              value={codeName}
+              onChange={(e) => handleCodeNameChange(e.target.value)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2 shrink-0 border-teal-300 text-teal-700 hover:bg-teal-50"
+              disabled={!codeName.trim() || !value.trim()}
+              onClick={handleSaveSnippet}
+            >
+              Save
+            </Button>
+            {codeSnippets.length > 0 && (
+              <Select onValueChange={handleLoadSnippet}>
+                <SelectTrigger className="w-[120px] h-7 text-xs shrink-0">
+                  <SelectValue placeholder="Load snippet" />
+                </SelectTrigger>
+                <SelectContent>
+                  {codeSnippets.map((s) => (
+                    <SelectItem key={s.id} value={s.id} className="text-xs">
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <CodeEditor
+            value={value}
+            onChange={(newCode) => {
+              setValue(newCode);
+              handleDatatype({
+                actionName: "code",
+                actionDataType: funcDataType,
+                actionValue: newCode,
+              });
+            }}
+            tokens={atTokens}
+            variables={[]}
+          />
+        </div>
+      )}
 
       {/* If condition builder */}
       {funcName === "if" && (
@@ -2426,7 +2715,10 @@ const FunctionActionInput = (payload: {
       )}
 
       {/* Suggestion panel */}
-      {funcName !== "if" && funcName !== "when" && funcName !== "loop" && (
+      {funcName !== "if" &&
+        funcName !== "when" &&
+        funcName !== "loop" &&
+        funcName !== "code" && (
         <SuggestionPanel
           dataType={funcDataType}
           methodName={funcName}
@@ -2546,6 +2838,12 @@ const InstructionPanel = () => {
                 </code>{" "}
                 — iteration block
               </span>
+              <span>
+                <code className="bg-teal-100 px-1 rounded text-teal-700">
+                  code
+                </code>{" "}
+                — JavaScript block
+              </span>
             </div>
           </div>
           <TokensReference />
@@ -2649,7 +2947,7 @@ const FunctionDefiner = () => {
                 </Button>
               </div>
 
-              <div className={cn("grid grid-cols-2 gap-1", "lg:grid-cols-4")}>
+              <div className={cn("grid grid-cols-2 gap-1", "lg:grid-cols-5")}>
                 <Button
                   variant="outline"
                   onClick={() =>
@@ -2747,6 +3045,32 @@ const FunctionDefiner = () => {
                 >
                   <IconCircleDashedPlus size={13} className="shrink-0" />
                   <span className="font-medium">Loop</span>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    dispatch(
+                      addFunctionAction({
+                        functionId: func.id,
+                        action: {
+                          id: "",
+                          name: "code",
+                          dataType: "",
+                          value: ["return @this;\n"],
+                        },
+                      }),
+                    )
+                  }
+                  className={cn(
+                    "h-7 text-xs gap-1.5 px-2.5",
+                    "border-teal-300 bg-teal-50 text-teal-700",
+                    "hover:bg-teal-100 hover:border-teal-400 hover:text-teal-800",
+                    "active:scale-95 transition-all duration-150",
+                  )}
+                >
+                  <IconCircleDashedPlus size={13} className="shrink-0" />
+                  <span className="font-medium">Code</span>
                 </Button>
               </div>
             </div>

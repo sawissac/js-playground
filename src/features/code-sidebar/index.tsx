@@ -77,6 +77,29 @@ function renderActionLine(action: FunctionActionInterface, idx: number): React.R
     );
   }
 
+  if (name === "code") {
+    const displayName = action.codeName || "code";
+    const firstLine = val ? val.trim().split("\n")[0] : "...";
+    return (
+      <div key={action.id} className="mb-1">
+        <div>
+          <span style={{ color: "#94a3b8" }}>{idx + 1}. </span>
+          <span style={{ color: "#2dd4bf" }}>{displayName}</span>
+          {!action.codeName && (
+            <>
+              <span style={{ color: "#64748b" }}>{" {"}</span>
+              <span style={{ color: "#94a3b8" }}> {firstLine}</span>
+              <span style={{ color: "#64748b" }}> {"}"}</span>
+            </>
+          )}
+          {action.codeName && (
+            <span style={{ color: "#64748b" }}>()</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   const typeColor = TYPE_COLORS[dataType] ?? "#94a3b8";
 
   return (
@@ -216,6 +239,16 @@ const CodeSidebar = () => {
                   <span style={{ color: "#e2e8f0" }}>{r.target[0] || "?"}</span>
                   <span style={{ color: "#64748b" }}> = </span>
                   <span style={{ color: "#94a3b8" }}>{r.target[1] || "?"}</span>
+                </>
+              ) : r.type === "code" ? (
+                <>
+                  <span style={{ color: "#e2e8f0" }}>{r.target[0] || "?"}</span>
+                  <span style={{ color: "#64748b" }}> ← </span>
+                  <span style={{ color: "#38bdf8" }}>{"code {"}</span>
+                  <span style={{ color: "#94a3b8" }}>
+                    {r.code ? ` ${r.code.trim().split("\n")[0]}...` : " ..."}
+                  </span>
+                  <span style={{ color: "#38bdf8" }}>{"}"}</span>
                 </>
               ) : (
                 <>

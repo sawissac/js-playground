@@ -10,12 +10,19 @@ export interface FunctionActionInterface {
   name: string;
   dataType: string;
   value: any;
+  codeName?: string; // user-defined name for "code" actions
   subActions?: FunctionActionInterface[]; // for "when" conditional blocks and "loop" iterations
   loopParams?: {
     start?: string;
     end?: string;
     step?: string;
   }; // for "loop" action parameters
+}
+
+export interface CodeSnippetInterface {
+  id: string;
+  name: string;
+  code: string;
 }
 
 export interface FunctionInterface {
@@ -27,9 +34,10 @@ export interface FunctionInterface {
 
 export interface Runner {
   id: string;
-  type: "set" | "call";
+  type: "set" | "call" | "code";
   target: [string, string];
   args: any[];
+  code?: string;
 }
 
 export interface EditorState {
@@ -37,6 +45,7 @@ export interface EditorState {
   variables: VariableInterface[];
   functions: FunctionInterface[];
   runner: Runner[];
+  codeSnippets: CodeSnippetInterface[];
 }
 
 export interface LogEntry {
