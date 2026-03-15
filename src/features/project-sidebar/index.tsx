@@ -21,8 +21,8 @@ import {
   IconPlus, 
   IconTrash, 
   IconEdit, 
-  IconFileExport, 
-  IconFileImport,
+  IconDownload, 
+  IconUpload,
   IconCheck,
   IconX,
 } from "@tabler/icons-react";
@@ -205,10 +205,10 @@ const ProjectSidebar = () => {
 
         <div className="flex gap-1 mt-1">
           <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] gap-1" onClick={handleExportProject}>
-            <IconFileExport size={12} /> Proj
+            <IconDownload size={12} /> Export
           </Button>
           <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] gap-1" onClick={() => projectFileInputRef.current?.click()}>
-            <IconFileImport size={12} /> Proj
+            <IconUpload size={12} /> Import
           </Button>
           <input ref={projectFileInputRef} type="file" accept=".json" onChange={handleImportProject} className="hidden" />
         </div>
@@ -285,10 +285,10 @@ const ProjectSidebar = () => {
         <span className="text-[10px] text-slate-500 font-medium px-1">Active Package Options</span>
         <div className="flex gap-1">
           <Button size="sm" variant="secondary" className="flex-1 h-7 text-[10px] gap-1" onClick={handleExportPackage}>
-            <IconFileExport size={12} /> Pkg
+            <IconDownload size={12} /> Export
           </Button>
           <Button size="sm" variant="secondary" className="flex-1 h-7 text-[10px] gap-1" onClick={() => packageFileInputRef.current?.click()}>
-            <IconFileImport size={12} /> Pkg
+            <IconUpload size={12} /> Import
           </Button>
           <input ref={packageFileInputRef} type="file" accept=".json" onChange={handleImportPackage} className="hidden" />
         </div>

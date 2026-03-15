@@ -95,12 +95,71 @@ export const editorSlice = createSlice({
       state.projectName = action.payload;
     },
     addPackage: (state, action: PayloadAction<{ name: string }>) => {
+      const tempActionId = uuidv4();
+      const useActionId = uuidv4();
+      const codeActionId = uuidv4();
+      const v1Id = uuidv4();
+      const v2Id = uuidv4();
+      const t1Id = uuidv4();
+
       const newPkg: Package = {
         id: uuidv4(),
         name: action.payload.name,
-        variables: [],
-        functions: [],
-        runner: [],
+        variables: [
+          {
+            id: v1Id,
+            name: "v1",
+            type: "string",
+            value: "Hello World",
+          },
+          {
+            id: v2Id,
+            name: "v2",
+            type: "string",
+            value: "Hello World",
+          },
+        ],
+        functions: [
+          {
+            id: t1Id,
+            name: "t1",
+            dataType: "",
+            actions: [
+              {
+                id: tempActionId,
+                name: "temp",
+                dataType: "string",
+                value: ["@arg1"],
+              },
+              {
+                id: useActionId,
+                name: "use",
+                dataType: "string",
+                value: ["@temp1"],
+              },
+              {
+                id: codeActionId,
+                name: "code",
+                dataType: "string",
+                value: ["return @this;\n"],
+              },
+            ],
+          },
+        ],
+        runner: [
+          {
+            id: uuidv4(),
+            type: "set",
+            target: ["v1", "Hello World"],
+            args: [],
+          },
+          {
+            id: uuidv4(),
+            type: "call",
+            target: ["v2", "t1"],
+             args: ["v1"],
+          },
+        ],
         codeSnippets: [],
       };
       state.packages.push(newPkg);
