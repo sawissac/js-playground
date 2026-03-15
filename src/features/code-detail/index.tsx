@@ -9,6 +9,14 @@ import {
 } from "@/state/slices/editorSlice";
 import { cn } from "@/lib/utils";
 import { VariableInterface, FunctionInterface, Runner } from "@/state/types";
+import {
+  IconEyeMinus,
+  IconEyePlus,
+  IconZoomIn,
+  IconZoomOut,
+  IconMaximize,
+} from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
 
 // ─── Objects Tab ──────────────────────────────────────────────────────────────
 
@@ -96,12 +104,10 @@ const ObjectCard = ({
   }, [variable.value, variable.type]);
 
   const colorClass =
-    TYPE_COLORS[variable.type] ??
-    "text-slate-700 bg-slate-50 border-slate-200";
+    TYPE_COLORS[variable.type] ?? "text-slate-700 bg-slate-50 border-slate-200";
   const badgeClass =
     TYPE_BADGE_COLORS[variable.type] ?? "bg-slate-100 text-slate-700";
-  const isMultiline =
-    variable.type === "array" || variable.type === "object";
+  const isMultiline = variable.type === "array" || variable.type === "object";
 
   return (
     <div
@@ -116,14 +122,20 @@ const ObjectCard = ({
           type="text"
           value={localName}
           onChange={(e) => setLocalName(e.target.value)}
-          onFocus={() => { nameFocusedRef.current = true; }}
+          onFocus={() => {
+            nameFocusedRef.current = true;
+          }}
           onBlur={(e) => {
             nameFocusedRef.current = false;
             if (e.target.value !== variable.name) {
-              dispatch(updateVariable({ id: variable.id, newName: e.target.value }));
+              dispatch(
+                updateVariable({ id: variable.id, newName: e.target.value }),
+              );
             }
           }}
-          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
           className="flex-1 h-6 text-xs font-mono font-semibold bg-transparent border-b border-current/30 focus:outline-none focus:border-current placeholder:opacity-40"
           placeholder="name"
         />
@@ -152,14 +164,22 @@ const ObjectCard = ({
           onChange={(e) => {
             setLocalValue(e.target.value);
             const parsed = parseValue(e.target.value, variable.type);
-            dispatch(updateVariableValue({ id: variable.id, value: parsed as any }));
+            dispatch(
+              updateVariableValue({ id: variable.id, value: parsed as any }),
+            );
           }}
-          onFocus={() => { valueFocusedRef.current = true; }}
-          onBlur={() => { valueFocusedRef.current = false; }}
+          onFocus={() => {
+            valueFocusedRef.current = true;
+          }}
+          onBlur={() => {
+            valueFocusedRef.current = false;
+          }}
           rows={3}
           className="w-full text-[11px] font-mono bg-white/60 rounded border border-current/20 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-current/20 resize-none leading-relaxed"
           placeholder={
-            variable.type === "array" ? '["item1", "item2"]' : '{"key": "value"}'
+            variable.type === "array"
+              ? '["item1", "item2"]'
+              : '{"key": "value"}'
           }
         />
       ) : (
@@ -169,13 +189,23 @@ const ObjectCard = ({
           onChange={(e) => {
             setLocalValue(e.target.value);
             const parsed = parseValue(e.target.value, variable.type);
-            dispatch(updateVariableValue({ id: variable.id, value: parsed as any }));
+            dispatch(
+              updateVariableValue({ id: variable.id, value: parsed as any }),
+            );
           }}
-          onFocus={() => { valueFocusedRef.current = true; }}
-          onBlur={() => { valueFocusedRef.current = false; }}
-          onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+          onFocus={() => {
+            valueFocusedRef.current = true;
+          }}
+          onBlur={() => {
+            valueFocusedRef.current = false;
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
           className="w-full h-7 text-[11px] font-mono bg-white/60 rounded border border-current/20 px-2 focus:outline-none focus:ring-2 focus:ring-current/20"
-          placeholder={variable.type === "boolean" ? "true / false" : "value..."}
+          placeholder={
+            variable.type === "boolean" ? "true / false" : "value..."
+          }
         />
       )}
     </div>
@@ -308,6 +338,7 @@ function buildGraph(
 const FlowChartTab = () => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const zoomRef = useRef<any>(null);
   const variables = useAppSelector((s) => s.editor.variables);
   const functions = useAppSelector((s) => s.editor.functions);
   const runner = useAppSelector((s) => s.editor.runner);
@@ -337,9 +368,22 @@ const FlowChartTab = () => {
       n.y = 30 + NODE_H + V_GAP;
     });
 
-    import("d3").then(({ select, drag }) => {
+    import("d3").then(({ select, drag, zoom, zoomIdentity }) => {
       const svg = select(svgRef.current!);
       svg.selectAll("*").remove();
+
+      // Root group for zoom/pan transforms
+      const rootGroup = svg.append("g");
+
+      // Zoom/pan behavior
+      const zoomBehavior = zoom<SVGSVGElement, unknown>()
+        .scaleExtent([0.3, 3])
+        .on("zoom", (event) => {
+          rootGroup.attr("transform", event.transform);
+        });
+
+      svg.call(zoomBehavior);
+      zoomRef.current = { zoomBehavior, svg, zoomIdentity };
 
       // Arrow markers
       const defs = svg.append("defs");
@@ -364,7 +408,7 @@ const FlowChartTab = () => {
       });
 
       // Edges — base (static) lines underneath
-      const edgeLayer = svg.append("g");
+      const edgeLayer = rootGroup.append("g");
       const edgeSel = edgeLayer
         .selectAll<SVGLineElement, FEdge>("line")
         .data(edges)
@@ -381,7 +425,7 @@ const FlowChartTab = () => {
         );
 
       // Edges — animated flowing dash overlay
-      const flowLayer = svg.append("g");
+      const flowLayer = rootGroup.append("g");
       const flowSel = flowLayer
         .selectAll<SVGLineElement, FEdge>("line")
         .data(edges)
@@ -409,7 +453,7 @@ const FlowChartTab = () => {
       });
 
       // Edge labels
-      const labelLayer = svg.append("g");
+      const labelLayer = rootGroup.append("g");
       const labelSel = labelLayer
         .selectAll<SVGTextElement, FEdge>("text")
         .data(edges.filter((e) => !!e.label))
@@ -423,7 +467,7 @@ const FlowChartTab = () => {
         .text((e) => e.label ?? "");
 
       // Nodes — data bound via D3 join so datum is properly set for drag
-      const nodeSel = svg
+      const nodeSel = rootGroup
         .append("g")
         .selectAll<SVGGElement, FNode>("g")
         .data(nodes)
@@ -476,12 +520,13 @@ const FlowChartTab = () => {
       // D3 drag — works because nodes are D3-data-joined above
       nodeSel.call(
         drag<SVGGElement, FNode>()
-          .on("start", function () {
+          .on("start", function (event) {
+            event.sourceEvent.stopPropagation();
             select(this).raise().style("cursor", "grabbing");
           })
           .on("drag", function (event, d) {
-            d.x = event.x - NODE_W / 2;
-            d.y = event.y - NODE_H / 2;
+            d.x += event.dx;
+            d.y += event.dy;
             select(this).attr("transform", `translate(${d.x},${d.y})`);
 
             const updateEdgePositions = (sel: any) => {
@@ -496,10 +541,7 @@ const FlowChartTab = () => {
 
             labelSel
               .attr("x", (e) => (e.source.x + e.target.x) / 2 + NODE_W / 2)
-              .attr(
-                "y",
-                (e) => (e.source.y + e.target.y) / 2 + NODE_H / 2 - 4,
-              );
+              .attr("y", (e) => (e.source.y + e.target.y) / 2 + NODE_H / 2 - 4);
           })
           .on("end", function () {
             select(this).style("cursor", "grab");
@@ -507,6 +549,24 @@ const FlowChartTab = () => {
       );
     });
   }, [variables, functions, runner, isEmpty]);
+
+  const handleZoomIn = () => {
+    if (!zoomRef.current) return;
+    const { zoomBehavior, svg } = zoomRef.current;
+    svg.transition().duration(300).call(zoomBehavior.scaleBy, 1.3);
+  };
+
+  const handleZoomOut = () => {
+    if (!zoomRef.current) return;
+    const { zoomBehavior, svg } = zoomRef.current;
+    svg.transition().duration(300).call(zoomBehavior.scaleBy, 0.7);
+  };
+
+  const handleFitView = () => {
+    if (!zoomRef.current) return;
+    const { zoomBehavior, svg, zoomIdentity } = zoomRef.current;
+    svg.transition().duration(500).call(zoomBehavior.transform, zoomIdentity);
+  };
 
   return (
     <div
@@ -537,6 +597,32 @@ const FlowChartTab = () => {
         </div>
       ) : (
         <>
+          {/* Controls */}
+          <div className="absolute top-2 left-2 flex items-center gap-0.5 bg-white/80 rounded-md border border-slate-200 p-0.5 z-10">
+            <button
+              onClick={handleZoomIn}
+              className="p-1 rounded hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors"
+              title="Zoom in"
+            >
+              <IconZoomIn size={14} />
+            </button>
+            <button
+              onClick={handleZoomOut}
+              className="p-1 rounded hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors"
+              title="Zoom out"
+            >
+              <IconZoomOut size={14} />
+            </button>
+            <div className="w-px h-4 bg-slate-200 mx-0.5" />
+            <button
+              onClick={handleFitView}
+              className="p-1 rounded hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors"
+              title="Fit to view"
+            >
+              <IconMaximize size={14} />
+            </button>
+          </div>
+
           {/* Legend */}
           <div className="absolute top-2 right-2 flex items-center gap-3 bg-white/80 rounded-md border border-slate-200 px-2 py-1 z-10">
             <span className="flex items-center gap-1 text-[10px] text-blue-700">
@@ -549,7 +635,7 @@ const FlowChartTab = () => {
             </span>
           </div>
           <p className="absolute bottom-2 left-2 text-[9px] text-slate-400 z-10">
-            drag nodes to rearrange
+            drag nodes · scroll to zoom · drag background to pan
           </p>
           {/* React provides only the container — D3 renders all SVG children */}
           <svg ref={svgRef} className="w-full h-full" />
@@ -559,16 +645,61 @@ const FlowChartTab = () => {
   );
 };
 
+// ─── Export Preview Tab ──────────────────────────────────────────────────────
+
+const ExportPreviewTab = () => {
+  const editorState = useAppSelector((s) => s.editor);
+
+  const exportData = {
+    variables: editorState.variables,
+    functions: editorState.functions,
+    runner: editorState.runner,
+    codeSnippets: editorState.codeSnippets || [],
+    exportDate: new Date().toISOString(),
+    version: "1.0",
+  };
+
+  const jsonString = JSON.stringify(exportData, null, 2);
+
+  const hasData =
+    editorState.variables.length > 0 ||
+    editorState.functions.length > 0 ||
+    editorState.runner.length > 0;
+
+  if (!hasData) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center text-xs text-muted-foreground py-12">
+        <p className="font-mono text-slate-400">{"{ }"}</p>
+        <p className="mt-2">No data to export.</p>
+        <p className="text-slate-400">
+          Create variables, functions, or runners to see export preview.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full overflow-y-auto bg-slate-900 p-3">
+      <pre className="text-[10px] leading-relaxed font-mono text-slate-300">
+        {jsonString}
+      </pre>
+    </div>
+  );
+};
+
 // ─── CodeDetail ───────────────────────────────────────────────────────────────
 
-type Tab = "objects" | "flowchart";
+type Tab = "objects" | "flowchart" | "export";
 
-const CodeDetail = () => {
+const CodeDetail = ({ onToggle, isCollapsed }: { onToggle?: () => void; isCollapsed?: boolean }) => {
   const [activeTab, setActiveTab] = useState<Tab>("objects");
+  const [localVisible, setLocalVisible] = useState(true);
+  const isVisible = isCollapsed !== undefined ? !isCollapsed : localVisible;
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "objects", label: "Objects" },
     { id: "flowchart", label: "Flow Chart" },
+    { id: "export", label: "Export Preview" },
   ];
 
   return (
@@ -579,7 +710,10 @@ const CodeDetail = () => {
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => {
+              setActiveTab(tab.id);
+              if (isCollapsed && onToggle) onToggle();
+            }}
             className={cn(
               "px-4 py-2 text-xs font-medium transition-colors relative",
               activeTab === tab.id
@@ -590,13 +724,25 @@ const CodeDetail = () => {
             {tab.label}
           </button>
         ))}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="ml-auto h-7 w-7 mr-1"
+          onClick={() => (onToggle ? onToggle() : setLocalVisible(!localVisible))}
+          title={isVisible ? "Hide content" : "Show content"}
+        >
+          {isVisible ? <IconEyeMinus size={14} /> : <IconEyePlus size={14} />}
+        </Button>
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-hidden">
-        {activeTab === "objects" && <ObjectsTab />}
-        {activeTab === "flowchart" && <FlowChartTab />}
-      </div>
+      {isVisible && (
+        <div className="flex-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+          {activeTab === "objects" && <ObjectsTab />}
+          {activeTab === "flowchart" && <FlowChartTab />}
+          {activeTab === "export" && <ExportPreviewTab />}
+        </div>
+      )}
     </div>
   );
 };

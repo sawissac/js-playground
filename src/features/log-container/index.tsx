@@ -12,6 +12,8 @@ import {
   IconFunction,
   IconPlayerPlay,
   IconArrowRight,
+  IconEyeMinus,
+  IconEyePlus,
 } from "@tabler/icons-react";
 import { clearLogs } from "@/state/slices/logSlice";
 import { useState, useRef, useEffect } from "react";
@@ -93,10 +95,12 @@ const LogRow = ({ log, baseTime }: { log: LogEntry; baseTime: number }) => {
   );
 };
 
-const LogContainer = () => {
+const LogContainer = ({ onToggle, isCollapsed }: { onToggle?: () => void; isCollapsed?: boolean }) => {
   const dispatch = useAppDispatch();
   const logs = useAppSelector((state) => state.log.logs);
   const [selectedLog, setSelectedLog] = useState<LogType>("info");
+  const [localVisible, setLocalVisible] = useState(true);
+  const isVisible = isCollapsed !== undefined ? !isCollapsed : localVisible;
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const filteredLogs = logs.filter((log) => log.type === selectedLog);
@@ -164,6 +168,19 @@ const LogContainer = () => {
           variant="default"
           size="icon"
           className="bg-transparent ml-auto h-5 w-5"
+          onClick={() => (onToggle ? onToggle() : setLocalVisible(!localVisible))}
+          title={isVisible ? "Hide logs" : "Show logs"}
+        >
+          {isVisible ? (
+            <IconEyeMinus size={11} className="text-slate-400" />
+          ) : (
+            <IconEyePlus size={11} className="text-slate-400" />
+          )}
+        </Button>
+        <Button
+          variant="default"
+          size="icon"
+          className="bg-transparent h-5 w-5"
           onClick={() => dispatch(clearLogs())}
           disabled={!logs.length}
           title="Clear logs"
@@ -173,22 +190,27 @@ const LogContainer = () => {
       </div>
 
       {/* Log entries */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
-        {logs.length === 0 ? (
-          <p className="text-[10px] text-slate-500 text-center py-4">
-            No logs yet — click{" "}
-            <strong className="text-slate-400">Run</strong>.
-          </p>
-        ) : filteredLogs.length === 0 ? (
-          <p className="text-[10px] text-slate-500 text-center py-4">
-            {LOG_EMPTY_MESSAGES[selectedLog]}
-          </p>
-        ) : (
-          filteredLogs.map((log, index) => (
-            <LogRow key={index} log={log} baseTime={baseTime} />
-          ))
-        )}
-      </div>
+      {isVisible && (
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto min-h-0 animate-in fade-in slide-in-from-top-2 duration-200"
+        >
+          {logs.length === 0 ? (
+            <p className="text-[10px] text-slate-500 text-center py-4">
+              No logs yet — click{" "}
+              <strong className="text-slate-400">Run</strong>.
+            </p>
+          ) : filteredLogs.length === 0 ? (
+            <p className="text-[10px] text-slate-500 text-center py-4">
+              {LOG_EMPTY_MESSAGES[selectedLog]}
+            </p>
+          ) : (
+            filteredLogs.map((log, index) => (
+              <LogRow key={index} log={log} baseTime={baseTime} />
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 };

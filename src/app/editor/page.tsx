@@ -16,6 +16,7 @@ import RunnerDefiner from "@/features/runner-definer";
 import LogContainer from "@/features/log-container";
 import CodeSidebar from "@/features/code-sidebar";
 import CodeDetail from "@/features/code-detail";
+import ImportExport from "@/features/import-export";
 import { cn } from "@/lib/utils";
 import {
   PanelLeftCloseIcon,
@@ -29,6 +30,10 @@ const Page = () => {
   const rightPanelRef = useRef<ImperativePanelHandle>(null);
   const [leftCollapsed, setLeftCollapsed] = React.useState(false);
   const [rightCollapsed, setRightCollapsed] = React.useState(false);
+  const codeDetailPanelRef = useRef<ImperativePanelHandle>(null);
+  const logPanelRef = useRef<ImperativePanelHandle>(null);
+  const [codeDetailCollapsed, setCodeDetailCollapsed] = React.useState(false);
+  const [logCollapsed, setLogCollapsed] = React.useState(false);
 
   const toggleLeft = () => {
     const panel = leftPanelRef.current;
@@ -50,12 +55,25 @@ const Page = () => {
     }
   };
 
+  const toggleCodeDetail = () => {
+    const panel = codeDetailPanelRef.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) panel.expand();
+    else panel.collapse();
+  };
+
+  const toggleLog = () => {
+    const panel = logPanelRef.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) panel.expand();
+    else panel.collapse();
+  };
+
   return (
     <>
       {/* Desktop Layout (lg and up) */}
       <div className={cn("hidden lg:block w-full h-screen")}>
         <ResizablePanelGroup direction="horizontal" className="w-full h-full">
-
           {/* Left Panel — Definitions + Code Preview */}
           <ResizablePanel
             ref={leftPanelRef}
@@ -68,7 +86,6 @@ const Page = () => {
             onExpand={() => setLeftCollapsed(false)}
           >
             <ResizablePanelGroup direction="vertical" className="h-full">
-
               {/* Definitions: Variables, DataTypes, Functions */}
               <ResizablePanel defaultSize={60} minSize={30}>
                 <div
@@ -85,6 +102,8 @@ const Page = () => {
                   <DataTypeContainer />
                   <hr className="border-border" />
                   <FunctionsContainer />
+                  <hr className="border-border" />
+                  <ImportExport />
                 </div>
               </ResizablePanel>
               <ResizableHandle withHandle />
@@ -107,7 +126,6 @@ const Page = () => {
                   </div>
                 </div>
               </ResizablePanel>
-
             </ResizablePanelGroup>
           </ResizablePanel>
           <ResizableHandle withHandle />
@@ -145,7 +163,9 @@ const Page = () => {
                     "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground",
                     "hover:bg-accent hover:text-accent-foreground transition-colors",
                   )}
-                  title={rightCollapsed ? "Show right panel" : "Hide right panel"}
+                  title={
+                    rightCollapsed ? "Show right panel" : "Hide right panel"
+                  }
                 >
                   <span className="hidden xl:inline">
                     {rightCollapsed ? "Runner" : "Hide"}
@@ -182,7 +202,6 @@ const Page = () => {
             onExpand={() => setRightCollapsed(false)}
           >
             <ResizablePanelGroup direction="vertical" className="h-full">
-
               {/* Runner Flow */}
               <ResizablePanel defaultSize={40} minSize={20}>
                 <div
@@ -200,33 +219,47 @@ const Page = () => {
               <ResizableHandle withHandle />
 
               {/* Code Detail — Objects + FlowChart tabs */}
-              <ResizablePanel defaultSize={32} minSize={18}>
+              <ResizablePanel
+                ref={codeDetailPanelRef}
+                defaultSize={32}
+                minSize={18}
+                collapsible
+                collapsedSize={5}
+                onCollapse={() => setCodeDetailCollapsed(true)}
+                onExpand={() => setCodeDetailCollapsed(false)}
+              >
                 <div
                   className={cn(
                     "h-full overflow-hidden",
                     "animate-in fade-in slide-in-from-right-4 duration-300 delay-200",
                   )}
                 >
-                  <CodeDetail />
+                  <CodeDetail onToggle={toggleCodeDetail} isCollapsed={codeDetailCollapsed} />
                 </div>
               </ResizablePanel>
               <ResizableHandle withHandle />
 
               {/* Log */}
-              <ResizablePanel defaultSize={28} minSize={12}>
+              <ResizablePanel
+                ref={logPanelRef}
+                defaultSize={28}
+                minSize={12}
+                collapsible
+                collapsedSize={4}
+                onCollapse={() => setLogCollapsed(true)}
+                onExpand={() => setLogCollapsed(false)}
+              >
                 <div
                   className={cn(
                     "p-2 h-full overflow-y-auto bg-slate-800 relative",
                     "animate-in fade-in slide-in-from-bottom-4 duration-300 delay-250",
                   )}
                 >
-                  <LogContainer />
+                  <LogContainer onToggle={toggleLog} isCollapsed={logCollapsed} />
                 </div>
               </ResizablePanel>
-
             </ResizablePanelGroup>
           </ResizablePanel>
-
         </ResizablePanelGroup>
       </div>
 
@@ -253,6 +286,8 @@ const Page = () => {
               <DataTypeContainer />
               <hr className="border-border" />
               <FunctionsContainer />
+              <hr className="border-border" />
+              <ImportExport />
             </div>
             <div
               className={cn(
@@ -341,6 +376,15 @@ const Page = () => {
             )}
           >
             <FunctionsContainer />
+          </div>
+          <hr className="border-border" />
+          <div
+            className={cn(
+              "flex flex-col gap-2",
+              "animate-in fade-in duration-300 delay-125",
+            )}
+          >
+            <ImportExport />
           </div>
 
           {/* Step 2: Build */}
