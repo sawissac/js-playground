@@ -17,6 +17,8 @@ import {
   IconMaximize,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
+import LogContainer from "@/features/log-container";
+import CodeSidebar from "@/features/code-sidebar";
 
 // ─── Objects Tab ──────────────────────────────────────────────────────────────
 
@@ -213,7 +215,11 @@ const ObjectCard = ({
 };
 
 const ObjectsTab = () => {
-  const variables = useAppSelector((s) => s.editor.packages.find(p => p.id === s.editor.activePackageId)!.variables);
+  const variables = useAppSelector(
+    (s) =>
+      s.editor.packages.find((p) => p.id === s.editor.activePackageId)!
+        .variables,
+  );
   const dataTypes = useAppSelector((s) => s.editor.dataTypes);
 
   if (variables.length === 0) {
@@ -339,9 +345,20 @@ const FlowChartTab = () => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<any>(null);
-  const variables = useAppSelector((s) => s.editor.packages.find(p => p.id === s.editor.activePackageId)!.variables);
-  const functions = useAppSelector((s) => s.editor.packages.find(p => p.id === s.editor.activePackageId)!.functions);
-  const runner = useAppSelector((s) => s.editor.packages.find(p => p.id === s.editor.activePackageId)!.runner);
+  const variables = useAppSelector(
+    (s) =>
+      s.editor.packages.find((p) => p.id === s.editor.activePackageId)!
+        .variables,
+  );
+  const functions = useAppSelector(
+    (s) =>
+      s.editor.packages.find((p) => p.id === s.editor.activePackageId)!
+        .functions,
+  );
+  const runner = useAppSelector(
+    (s) =>
+      s.editor.packages.find((p) => p.id === s.editor.activePackageId)!.runner,
+  );
 
   const isEmpty = variables.length === 0 && functions.length === 0;
 
@@ -649,13 +666,16 @@ const FlowChartTab = () => {
 
 const ExportPreviewTab = () => {
   const editorState = useAppSelector((s) => s.editor);
-  const activePackage = editorState.packages.find((p) => p.id === editorState.activePackageId)!;
+  const activePackage = editorState.packages.find(
+    (p) => p.id === editorState.activePackageId,
+  )!;
 
   const exportData = {
     variables: activePackage.variables,
     functions: activePackage.functions,
     runner: activePackage.runner,
     codeSnippets: activePackage.codeSnippets || [],
+    cdnPackages: activePackage.cdnPackages || [],
     exportDate: new Date().toISOString(),
     version: "1.0",
   };
@@ -690,17 +710,23 @@ const ExportPreviewTab = () => {
 
 // ─── CodeDetail ───────────────────────────────────────────────────────────────
 
-type Tab = "objects" | "flowchart" | "export";
+type Tab = "code" | "objects" | "flowchart" | "export" | "log";
 
-const CodeDetail = ({ onToggle, isCollapsed }: { onToggle?: () => void; isCollapsed?: boolean }) => {
-  const [activeTab, setActiveTab] = useState<Tab>("objects");
-  const [localVisible, setLocalVisible] = useState(true);
-  const isVisible = isCollapsed !== undefined ? !isCollapsed : localVisible;
+const CodeDetail = ({
+  onToggle,
+  isCollapsed,
+}: {
+  onToggle?: () => void;
+  isCollapsed?: boolean;
+}) => {
+  const [activeTab, setActiveTab] = useState<Tab>("code");
 
   const tabs: { id: Tab; label: string }[] = [
+    { id: "code", label: "Code Preview" },
     { id: "objects", label: "Objects" },
     { id: "flowchart", label: "Flow Chart" },
     { id: "export", label: "Export Preview" },
+    { id: "log", label: "Log" },
   ];
 
   return (
@@ -711,10 +737,7 @@ const CodeDetail = ({ onToggle, isCollapsed }: { onToggle?: () => void; isCollap
           <button
             key={tab.id}
             type="button"
-            onClick={() => {
-              setActiveTab(tab.id);
-              if (isCollapsed && onToggle) onToggle();
-            }}
+            onClick={() => setActiveTab(tab.id)}
             className={cn(
               "px-4 py-2 text-xs font-medium transition-colors relative",
               activeTab === tab.id
@@ -725,25 +748,35 @@ const CodeDetail = ({ onToggle, isCollapsed }: { onToggle?: () => void; isCollap
             {tab.label}
           </button>
         ))}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="ml-auto h-7 w-7 mr-1"
-          onClick={() => (onToggle ? onToggle() : setLocalVisible(!localVisible))}
-          title={isVisible ? "Hide content" : "Show content"}
-        >
-          {isVisible ? <IconEyeMinus size={14} /> : <IconEyePlus size={14} />}
-        </Button>
+        {onToggle && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-auto h-7 w-7 mr-1"
+            onClick={onToggle}
+            title={isCollapsed ? "Show content" : "Hide content"}
+          >
+            {isCollapsed ? (
+              <IconEyePlus size={14} />
+            ) : (
+              <IconEyeMinus size={14} />
+            )}
+          </Button>
+        )}
       </div>
 
       {/* Tab content */}
-      {isVisible && (
-        <div className="flex-1 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-          {activeTab === "objects" && <ObjectsTab />}
-          {activeTab === "flowchart" && <FlowChartTab />}
-          {activeTab === "export" && <ExportPreviewTab />}
-        </div>
-      )}
+      <div className="flex-1 overflow-hidden">
+        {activeTab === "code" && <CodeSidebar />}
+        {activeTab === "objects" && <ObjectsTab />}
+        {activeTab === "flowchart" && <FlowChartTab />}
+        {activeTab === "export" && <ExportPreviewTab />}
+        {activeTab === "log" && (
+          <div className="h-full bg-slate-800 p-2">
+            <LogContainer />
+          </div>
+        )}
+      </div>
     </div>
   );
 };

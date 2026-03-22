@@ -40,13 +40,22 @@ export interface Runner {
   code?: string;
 }
 
+export interface CdnPackage {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+}
+
 export interface Package {
   id: string;
   name: string;
+  enabled: boolean;
   variables: VariableInterface[];
   functions: FunctionInterface[];
   runner: Runner[];
   codeSnippets: CodeSnippetInterface[];
+  cdnPackages: CdnPackage[];
 }
 
 export interface EditorState {

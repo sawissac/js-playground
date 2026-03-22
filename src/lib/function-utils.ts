@@ -159,6 +159,7 @@ async function executeCodeAction(
   mathTemp: any[],
   tempVar: any[],
   stepResults: any[],
+  cdnModules: Record<string, any> = {},
 ): Promise<any> {
   if (!codeStr.trim()) return temp;
 
@@ -188,20 +189,21 @@ async function executeCodeAction(
 
   // Transform @tokens to context lookups
   let code = codeStr;
-  code = code.replace(
-    /@(\w+(?:\([^)]*\))?(?:\.\w+)*)/g,
-    (_match, token) => {
-      const dotIdx = token.indexOf(".");
-      if (dotIdx === -1) return `__ctx__["${token}"]`;
-      const base = token.slice(0, dotIdx);
-      const rest = token.slice(dotIdx);
-      return `__ctx__["${base}"]${rest}`;
-    },
-  );
+  code = code.replace(/@(\w+(?:\([^)]*\))?(?:\.\w+)*)/g, (_match, token) => {
+    const dotIdx = token.indexOf(".");
+    if (dotIdx === -1) return `__ctx__["${token}"]`;
+    const base = token.slice(0, dotIdx);
+    const rest = token.slice(dotIdx);
+    return `__ctx__["${base}"]${rest}`;
+  });
+
+  // Inject CDN modules into code execution context
+  const cdnNames = Object.keys(cdnModules);
+  const cdnValues = Object.values(cdnModules);
 
   // eslint-disable-next-line no-new-func
-  const fn = new AsyncFunction("__ctx__", code);
-  return await fn(tokenCtx);
+  const fn = new AsyncFunction("__ctx__", ...cdnNames, code);
+  return await fn(tokenCtx, ...cdnValues);
 }
 
 export async function fnRunner(
@@ -209,6 +211,7 @@ export async function fnRunner(
   args: any[],
   actions: FunctionActionInterface[],
   allFunctions?: { name: string; actions: FunctionActionInterface[] }[],
+  cdnModules: Record<string, any> = {},
 ): Promise<any> {
   try {
     let temp: any = deepClone(payload);
@@ -227,19 +230,22 @@ export async function fnRunner(
     ]);
     const resolveConditionStr = (condition: string): string => {
       // Step 1 — replace @tokens with their JS-safe values
-      let result = condition.replace(/@\w+(?:\.\w+)*(?:\([^)]*\))?/g, (token) => {
-        const val = uniqueIdentifier(
-          [token],
-          args,
-          temp,
-          mathTemp,
-          tempVar,
-          stepResults,
-        )[0];
-        if (val === null || val === undefined) return "null";
-        if (typeof val === "string") return JSON.stringify(val);
-        return String(val);
-      });
+      let result = condition.replace(
+        /@\w+(?:\.\w+)*(?:\([^)]*\))?/g,
+        (token) => {
+          const val = uniqueIdentifier(
+            [token],
+            args,
+            temp,
+            mathTemp,
+            tempVar,
+            stepResults,
+          )[0];
+          if (val === null || val === undefined) return "null";
+          if (typeof val === "string") return JSON.stringify(val);
+          return String(val);
+        },
+      );
       // Step 2 — quote remaining bareword string literals so they don't throw
       // ReferenceError (e.g. `@this == esther` → `"value" == "esther"`)
       result = result.replace(
@@ -315,7 +321,9 @@ export async function fnRunner(
           }
 
           const runSubActions = async (iterIndex: number): Promise<any> => {
-            const currentItem = Array.isArray(temp) ? temp[iterIndex] : iterIndex;
+            const currentItem = Array.isArray(temp)
+              ? temp[iterIndex]
+              : iterIndex;
             // When temp is an array, start with the current element so methods
             // like toUpperCase() apply per-element automatically.
             let subTemp = Array.isArray(temp)
@@ -379,6 +387,7 @@ export async function fnRunner(
                   mathTemp,
                   tempVar,
                   subStepResults,
+                  cdnModules,
                 );
                 subStepResults.push(subTemp);
                 continue;
@@ -408,6 +417,7 @@ export async function fnRunner(
                     subParsed,
                     targetFunc.actions,
                     allFunctions,
+                    cdnModules,
                   );
                 }
                 subStepResults.push(subTemp);
@@ -415,8 +425,13 @@ export async function fnRunner(
               }
 
               const wrapped = wrapPrimitive(subTemp);
-              if (wrapped != null && typeof wrapped[subAction.name] === "function") {
-                subTemp = unwrapPrimitive(wrapped[subAction.name](...subParsed));
+              if (
+                wrapped != null &&
+                typeof wrapped[subAction.name] === "function"
+              ) {
+                subTemp = unwrapPrimitive(
+                  wrapped[subAction.name](...subParsed),
+                );
               } else if (wrapped != null) {
                 subTemp = unwrapPrimitive(wrapped[subAction.name]);
               }
@@ -532,6 +547,7 @@ export async function fnRunner(
             mathTemp,
             tempVar,
             stepResults,
+            cdnModules,
           );
           stepResults.push(temp);
           continue;
@@ -556,6 +572,7 @@ export async function fnRunner(
             parsedArgs,
             targetFunc.actions,
             allFunctions,
+            cdnModules,
           );
           stepResults.push(temp);
           continue;

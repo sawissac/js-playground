@@ -95,12 +95,16 @@ const LogRow = ({ log, baseTime }: { log: LogEntry; baseTime: number }) => {
   );
 };
 
-const LogContainer = ({ onToggle, isCollapsed }: { onToggle?: () => void; isCollapsed?: boolean }) => {
+const LogContainer = ({
+  onToggle,
+  isCollapsed,
+}: {
+  onToggle?: () => void;
+  isCollapsed?: boolean;
+}) => {
   const dispatch = useAppDispatch();
   const logs = useAppSelector((state) => state.log.logs);
   const [selectedLog, setSelectedLog] = useState<LogType>("info");
-  const [localVisible, setLocalVisible] = useState(true);
-  const isVisible = isCollapsed !== undefined ? !isCollapsed : localVisible;
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const filteredLogs = logs.filter((log) => log.type === selectedLog);
@@ -164,19 +168,22 @@ const LogContainer = ({ onToggle, isCollapsed }: { onToggle?: () => void; isColl
           {selectedLog === "info" && <IconCheck size={9} />}
         </Badge>
 
-        <Button
-          variant="default"
-          size="icon"
-          className="bg-transparent ml-auto h-5 w-5"
-          onClick={() => (onToggle ? onToggle() : setLocalVisible(!localVisible))}
-          title={isVisible ? "Hide logs" : "Show logs"}
-        >
-          {isVisible ? (
-            <IconEyeMinus size={11} className="text-slate-400" />
-          ) : (
-            <IconEyePlus size={11} className="text-slate-400" />
-          )}
-        </Button>
+        {onToggle && (
+          <Button
+            variant="default"
+            size="icon"
+            className="bg-transparent ml-auto h-5 w-5"
+            onClick={onToggle}
+            title={isCollapsed ? "Show logs" : "Hide logs"}
+          >
+            {isCollapsed ? (
+              <IconEyePlus size={11} className="text-slate-400" />
+            ) : (
+              <IconEyeMinus size={11} className="text-slate-400" />
+            )}
+          </Button>
+        )}
+        {!onToggle && <div className="ml-auto" />}
         <Button
           variant="default"
           size="icon"
@@ -190,27 +197,21 @@ const LogContainer = ({ onToggle, isCollapsed }: { onToggle?: () => void; isColl
       </div>
 
       {/* Log entries */}
-      {isVisible && (
-        <div
-          ref={scrollRef}
-          className="flex-1 overflow-y-auto min-h-0 animate-in fade-in slide-in-from-top-2 duration-200"
-        >
-          {logs.length === 0 ? (
-            <p className="text-[10px] text-slate-500 text-center py-4">
-              No logs yet — click{" "}
-              <strong className="text-slate-400">Run</strong>.
-            </p>
-          ) : filteredLogs.length === 0 ? (
-            <p className="text-[10px] text-slate-500 text-center py-4">
-              {LOG_EMPTY_MESSAGES[selectedLog]}
-            </p>
-          ) : (
-            filteredLogs.map((log, index) => (
-              <LogRow key={index} log={log} baseTime={baseTime} />
-            ))
-          )}
-        </div>
-      )}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
+        {logs.length === 0 ? (
+          <p className="text-[10px] text-slate-500 text-center py-4">
+            No logs yet — click <strong className="text-slate-400">Run</strong>.
+          </p>
+        ) : filteredLogs.length === 0 ? (
+          <p className="text-[10px] text-slate-500 text-center py-4">
+            {LOG_EMPTY_MESSAGES[selectedLog]}
+          </p>
+        ) : (
+          filteredLogs.map((log, index) => (
+            <LogRow key={index} log={log} baseTime={baseTime} />
+          ))
+        )}
+      </div>
     </div>
   );
 };

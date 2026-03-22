@@ -3,6 +3,7 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { v4 as uuidv4 } from "uuid";
 import {
+  CdnPackage,
   CodeSnippetInterface,
   EditorState,
   FunctionActionInterface,
@@ -22,6 +23,7 @@ const initialState: EditorState = {
     {
       id: initialPackageId,
       name: "Main Package",
+      enabled: true,
       variables: [
         {
           id: "466f7e20-1465-45ae-a93b-30da6a6a54f1",
@@ -78,6 +80,14 @@ const initialState: EditorState = {
         },
       ],
       codeSnippets: [],
+      cdnPackages: [
+        {
+          id: "cdn-d3-default",
+          name: "d3",
+          url: "https://cdn.jsdelivr.net/npm/d3@7",
+          enabled: true,
+        },
+      ],
     },
   ],
 };
@@ -105,6 +115,7 @@ export const editorSlice = createSlice({
       const newPkg: Package = {
         id: uuidv4(),
         name: action.payload.name,
+        enabled: true,
         variables: [
           {
             id: v1Id,
@@ -157,10 +168,18 @@ export const editorSlice = createSlice({
             id: uuidv4(),
             type: "call",
             target: ["v2", "t1"],
-             args: ["v1"],
+            args: ["v1"],
           },
         ],
         codeSnippets: [],
+        cdnPackages: [
+          {
+            id: uuidv4(),
+            name: "d3",
+            url: "https://cdn.jsdelivr.net/npm/d3@7",
+            enabled: true,
+          },
+        ],
       };
       state.packages.push(newPkg);
       state.activePackageId = newPkg.id; // Switch to the new package automatically
@@ -172,7 +191,10 @@ export const editorSlice = createSlice({
         state.activePackageId = state.packages[0].id;
       }
     },
-    renamePackage: (state, action: PayloadAction<{ id: string; name: string }>) => {
+    renamePackage: (
+      state,
+      action: PayloadAction<{ id: string; name: string }>,
+    ) => {
       const pkg = state.packages.find((p) => p.id === action.payload.id);
       if (pkg) {
         pkg.name = action.payload.name;
@@ -181,6 +203,12 @@ export const editorSlice = createSlice({
     setActivePackage: (state, action: PayloadAction<string>) => {
       if (state.packages.some((p) => p.id === action.payload)) {
         state.activePackageId = action.payload;
+      }
+    },
+    togglePackageEnabled: (state, action: PayloadAction<string>) => {
+      const pkg = state.packages.find((p) => p.id === action.payload);
+      if (pkg) {
+        pkg.enabled = !pkg.enabled;
       }
     },
     importProject: (state, action: PayloadAction<EditorState>) => {
@@ -428,9 +456,7 @@ export const editorSlice = createSlice({
 
     removeRunner: (state, action: PayloadAction<string>) => {
       const pkg = getActivePkg(state);
-      pkg.runner = pkg.runner.filter(
-        (runner) => runner.id !== action.payload,
-      );
+      pkg.runner = pkg.runner.filter((runner) => runner.id !== action.payload);
     },
 
     addWhenSubAction: (
@@ -673,6 +699,15 @@ export const editorSlice = createSlice({
       pkg.runner.splice(toIndex, 0, movedRunner);
     },
 
+    reorderPackages: (
+      state,
+      action: PayloadAction<{ fromIndex: number; toIndex: number }>,
+    ) => {
+      const { fromIndex, toIndex } = action.payload;
+      const [moved] = state.packages.splice(fromIndex, 1);
+      state.packages.splice(toIndex, 0, moved);
+    },
+
     addCodeSnippet: (
       state,
       action: PayloadAction<{ name: string; code: string }>,
@@ -700,9 +735,7 @@ export const editorSlice = createSlice({
       }>,
     ) => {
       const pkg = getActivePkg(state);
-      const idx = pkg.codeSnippets.findIndex(
-        (s) => s.id === action.payload.id,
-      );
+      const idx = pkg.codeSnippets.findIndex((s) => s.id === action.payload.id);
       if (idx !== -1) {
         pkg.codeSnippets[idx] = {
           ...pkg.codeSnippets[idx],
@@ -718,6 +751,47 @@ export const editorSlice = createSlice({
       );
     },
 
+    addCdnPackage: (
+      state,
+      action: PayloadAction<{ name: string; url: string }>,
+    ) => {
+      const pkg = getActivePkg(state);
+      if (!pkg.cdnPackages) pkg.cdnPackages = [];
+      pkg.cdnPackages.push({
+        id: uuidv4(),
+        name: action.payload.name,
+        url: action.payload.url,
+        enabled: true,
+      });
+    },
+
+    removeCdnPackage: (state, action: PayloadAction<string>) => {
+      const pkg = getActivePkg(state);
+      pkg.cdnPackages = (pkg.cdnPackages || []).filter(
+        (c) => c.id !== action.payload,
+      );
+    },
+
+    toggleCdnPackage: (state, action: PayloadAction<string>) => {
+      const pkg = getActivePkg(state);
+      const cdn = (pkg.cdnPackages || []).find((c) => c.id === action.payload);
+      if (cdn) cdn.enabled = !cdn.enabled;
+    },
+
+    updateCdnPackage: (
+      state,
+      action: PayloadAction<{ id: string; name?: string; url?: string }>,
+    ) => {
+      const pkg = getActivePkg(state);
+      const cdn = (pkg.cdnPackages || []).find(
+        (c) => c.id === action.payload.id,
+      );
+      if (cdn) {
+        if (action.payload.name !== undefined) cdn.name = action.payload.name;
+        if (action.payload.url !== undefined) cdn.url = action.payload.url;
+      }
+    },
+
     importState: (state, action: PayloadAction<Partial<Package>>) => {
       // Legacy import for a single package into current package
       const importedState = action.payload;
@@ -727,6 +801,8 @@ export const editorSlice = createSlice({
       if (importedState.runner) pkg.runner = importedState.runner;
       if (importedState.codeSnippets)
         pkg.codeSnippets = importedState.codeSnippets;
+      if (importedState.cdnPackages)
+        pkg.cdnPackages = importedState.cdnPackages;
     },
 
     resetState: (state) => {
@@ -746,6 +822,7 @@ export const {
   removePackage,
   renamePackage,
   setActivePackage,
+  togglePackageEnabled,
   importProject,
   importPackage,
   setVariables,
@@ -775,6 +852,11 @@ export const {
   updateRunner,
   removeRunner,
   reorderRunnerSteps,
+  reorderPackages,
+  addCdnPackage,
+  removeCdnPackage,
+  toggleCdnPackage,
+  updateCdnPackage,
   addCodeSnippet,
   updateCodeSnippet,
   removeCodeSnippet,

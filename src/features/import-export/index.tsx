@@ -67,7 +67,9 @@ const InstructionPanel = () => {
 const ImportExport = () => {
   const dispatch = useAppDispatch();
   const editorState = useAppSelector((state) => state.editor);
-  const activePackage = editorState.packages.find((p) => p.id === editorState.activePackageId)!;
+  const activePackage = editorState.packages.find(
+    (p) => p.id === editorState.activePackageId,
+  )!;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
 
@@ -78,6 +80,7 @@ const ImportExport = () => {
         functions: activePackage.functions,
         runner: activePackage.runner,
         codeSnippets: activePackage.codeSnippets || [],
+        cdnPackages: activePackage.cdnPackages || [],
         exportDate: new Date().toISOString(),
         version: "1.0",
       };
@@ -121,7 +124,11 @@ const ImportExport = () => {
         const content = e.target?.result as string;
         const importedData = JSON.parse(content);
 
-        if (!importedData.variables && !importedData.functions && !importedData.runner) {
+        if (
+          !importedData.variables &&
+          !importedData.functions &&
+          !importedData.runner
+        ) {
           throw new Error("Invalid workspace file format");
         }
 

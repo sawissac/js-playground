@@ -5,6 +5,21 @@ import { Popover as PopoverPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Popover component for displaying floating content anchored to a trigger element.
+ *
+ * How it works:
+ * - Built on Radix UI Popover primitives for accessible, dismissible floating panels.
+ * - Composed of: `Popover` (root state), `PopoverTrigger` (anchor button),
+ *   `PopoverContent` (floating panel), `PopoverAnchor` (custom anchor point),
+ *   `PopoverHeader`, `PopoverTitle`, `PopoverDescription`.
+ * - `PopoverContent` renders inside a portal and positions itself relative to the trigger.
+ *   `align` controls horizontal alignment (start, center, end); `sideOffset` controls gap.
+ *   Opens with fade + zoom animation and slides in from the relevant direction.
+ * - Uses `rounded-xl` for a soft container shape.
+ * - Click outside or press ESC to dismiss (Radix built-in).
+ * - Use `PopoverAnchor` to anchor the popover to a different element than the trigger.
+ */
 function Popover({
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
@@ -30,7 +45,7 @@ function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-hidden data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          "z-50 w-72 origin-(--radix-popover-content-transform-origin) rounded-xl border bg-popover p-4 text-popover-foreground shadow-md outline-hidden data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           className
         )}
         {...props}
