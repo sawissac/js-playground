@@ -37,6 +37,9 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { useRunner } from "@/hooks/useRunner";
 import PromptDialog from "./prompt-dialog";
+import { validateCDNUrl, VERIFIED_CDN_PACKAGES } from "@/lib/cdnSecurity";
+import { auditLog } from "@/lib/securityAudit";
+import { addLog } from "@/state/slices/logSlice";
 
 const PREDEFINED_CDN_PACKAGES = [
   { name: "d3", url: "https://cdn.jsdelivr.net/npm/d3@7" },
@@ -81,6 +84,9 @@ const RendererDialog = ({
   const [editingCdnId, setEditingCdnId] = useState<string | null>(null);
   const [editCdnName, setEditCdnName] = useState("");
   const [editCdnUrl, setEditCdnUrl] = useState("");
+  const [cdnValidationWarnings, setCdnValidationWarnings] = useState<string[]>(
+    [],
+  );
 
   const { run } = useRunner();
 
@@ -139,7 +145,42 @@ const RendererDialog = ({
 
   const handleAddCdn = () => {
     if (cdnName.trim() && cdnUrl.trim()) {
+      // Validate CDN URL
+      const validation = validateCDNUrl(cdnUrl.trim());
+
+      if (!validation.valid) {
+        dispatch(
+          addLog({
+            type: "error",
+            message: `CDN validation failed: ${validation.errors.join(", ")}`,
+            context: "cdn-security",
+          }),
+        );
+        setCdnValidationWarnings(validation.errors);
+        return;
+      }
+
+      // Show warnings for untrusted domains
+      if (validation.warnings.length > 0) {
+        dispatch(
+          addLog({
+            type: "warning",
+            message: `CDN warnings: ${validation.warnings.join(", ")}`,
+            context: "cdn-security",
+          }),
+        );
+        auditLog.cdnSecurityWarning(cdnUrl.trim(), validation.warnings);
+        setCdnValidationWarnings(validation.warnings);
+      } else {
+        setCdnValidationWarnings([]);
+      }
+
       dispatch(addCdnPackage({ name: cdnName.trim(), url: cdnUrl.trim() }));
+      auditLog.cdnLoad(cdnUrl.trim(), true, validation.trusted, {
+        name: cdnName.trim(),
+        packageName: activePackage.name,
+      });
+
       setCdnName("");
       setCdnUrl("");
       setShowAddCdn(false);
@@ -163,6 +204,32 @@ const RendererDialog = ({
 
   const handleSaveEditCdn = () => {
     if (editingCdnId && editCdnName.trim() && editCdnUrl.trim()) {
+      // Validate CDN URL
+      const validation = validateCDNUrl(editCdnUrl.trim());
+
+      if (!validation.valid) {
+        dispatch(
+          addLog({
+            type: "error",
+            message: `CDN validation failed: ${validation.errors.join(", ")}`,
+            context: "cdn-security",
+          }),
+        );
+        return;
+      }
+
+      // Show warnings for untrusted domains
+      if (validation.warnings.length > 0) {
+        dispatch(
+          addLog({
+            type: "warning",
+            message: `CDN warnings: ${validation.warnings.join(", ")}`,
+            context: "cdn-security",
+          }),
+        );
+        auditLog.cdnSecurityWarning(editCdnUrl.trim(), validation.warnings);
+      }
+
       dispatch(
         updateCdnPackage({
           id: editingCdnId,
@@ -170,6 +237,10 @@ const RendererDialog = ({
           url: editCdnUrl.trim(),
         }),
       );
+      auditLog.cdnLoad(editCdnUrl.trim(), true, validation.trusted, {
+        name: editCdnName.trim(),
+        packageName: activePackage.name,
+      });
       setEditingCdnId(null);
     }
   };
@@ -418,10 +489,20 @@ const RendererDialog = ({
                   <Input
                     type="text"
                     value={cdnUrl}
-                    onChange={(e) => setCdnUrl(e.target.value)}
+                    onChange={(e) => {
+                      setCdnUrl(e.target.value);
+                      setCdnValidationWarnings([]);
+                    }}
                     placeholder="URL (e.g. https://cdn.jsdelivr.net/npm/lodash)"
                     className="h-6 text-[10px] rounded-lg"
                   />
+                  {cdnValidationWarnings.length > 0 && (
+                    <div className="text-[9px] text-amber-600 bg-amber-50 border border-amber-200 rounded p-1.5 space-y-0.5">
+                      {cdnValidationWarnings.map((warning, i) => (
+                        <div key={i}>⚠️ {warning}</div>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex gap-1">
                     <Button
                       variant="default"

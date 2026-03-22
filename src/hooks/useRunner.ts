@@ -4,9 +4,18 @@ import { fnRunner, deepClone } from "@/lib/function-utils";
 import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { updateVariableValue } from "@/state/slices/editorSlice";
 import { addLog, clearLogs } from "@/state/slices/logSlice";
+import {
+  executeWithTimeout,
+  detectDangerousPatterns,
+} from "@/lib/executionSandbox";
+import { validateCodeLength } from "@/lib/validation";
+import { canExecuteCode, recordCodeExecution } from "@/lib/rateLimiter";
+import { auditLog } from "@/lib/securityAudit";
 
 // AsyncFunction constructor for async code blocks
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+
+const CODE_EXECUTION_TIMEOUT = 10000; // 10 seconds per code block
 
 // Sanitize CDN names to valid JavaScript identifiers
 const sanitizeCdnName = (name: string): string => {
@@ -19,6 +28,20 @@ export const useRunner = () => {
   const dispatch = useAppDispatch();
 
   const run = async () => {
+    // Check rate limit before execution
+    const rateLimitCheck = canExecuteCode();
+    if (!rateLimitCheck.allowed) {
+      dispatch(
+        addLog({
+          type: "error",
+          message: rateLimitCheck.reason || "Rate limit exceeded",
+          context: "rate-limit",
+        }),
+      );
+      auditLog.rateLimitExceeded(rateLimitCheck.retryAfter || 0);
+      return;
+    }
+
     dispatch(clearLogs());
 
     // Get all enabled packages in order
@@ -249,8 +272,34 @@ export const useRunner = () => {
               e: "",
             };
 
+            // Validate code length
+            const rawCode = run.code || "return undefined;";
+            const codeValidation = validateCodeLength(rawCode);
+            if (!codeValidation.valid) {
+              throw new Error(codeValidation.error);
+            }
+
+            // Check for dangerous patterns
+            const safetyCheck = detectDangerousPatterns(rawCode);
+            if (!safetyCheck.safe) {
+              dispatch(
+                addLog({
+                  type: "warning",
+                  message: `Code warnings: ${safetyCheck.warnings.join(", ")}`,
+                  context: "safety",
+                }),
+              );
+              // Log each dangerous pattern
+              safetyCheck.warnings.forEach((warning) => {
+                auditLog.dangerousPattern(warning, rawCode, {
+                  variableName: variable.name,
+                  packageName: pkg.name,
+                });
+              });
+            }
+
             // Transform code: replace @token with __ctx__["token"]
-            let code = run.code || "return undefined;";
+            let code = rawCode;
             code = code.replace(/@(\w+(?:\.\w+)*)/g, (_match, token) => {
               const dotIndex = token.indexOf(".");
               if (dotIndex === -1) {
@@ -275,17 +324,58 @@ export const useRunner = () => {
             const cdnParamNames = Object.keys(cdnModules);
             const cdnParamValues = Object.values(cdnModules);
 
-            // eslint-disable-next-line no-new-func
-            const fn = new AsyncFunction(
-              "__ctx__",
-              ...cdnParamNames,
-              ...safeVarNames,
-              code,
-            );
-            const result = await fn(
-              tokenCtx,
-              ...cdnParamValues,
-              ...safeVarValues,
+            // Build execution context
+            const executionContext: Record<string, any> = {
+              __ctx__: tokenCtx,
+            };
+            cdnParamNames.forEach((name, i) => {
+              executionContext[name] = cdnParamValues[i];
+            });
+            safeVarNames.forEach((name, i) => {
+              executionContext[name] = safeVarValues[i];
+            });
+
+            // Execute with timeout protection
+            const executionResult = await executeWithTimeout(code, {
+              timeout: CODE_EXECUTION_TIMEOUT,
+              context: executionContext,
+            });
+
+            if (!executionResult.success) {
+              if (executionResult.timedOut) {
+                dispatch(
+                  addLog({
+                    type: "error",
+                    message: executionResult.error || "Execution timeout",
+                    context: "timeout",
+                  }),
+                );
+                auditLog.codeTimeout(CODE_EXECUTION_TIMEOUT, {
+                  variableName: variable.name,
+                  packageName: pkg.name,
+                });
+                recordCodeExecution(false, true);
+              } else {
+                recordCodeExecution(false, false);
+              }
+              throw new Error(executionResult.error || "Code execution failed");
+            }
+
+            // Record successful execution
+            recordCodeExecution(true, false);
+            auditLog.codeExecution(true, executionResult.executionTime, {
+              variableName: variable.name,
+              packageName: pkg.name,
+            });
+
+            const result = executionResult.result;
+
+            dispatch(
+              addLog({
+                type: "info",
+                message: `Executed in ${executionResult.executionTime.toFixed(2)}ms`,
+                context: "performance",
+              }),
             );
 
             const resultVarIndex = updatedVariables.findIndex(

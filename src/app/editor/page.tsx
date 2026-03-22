@@ -24,6 +24,7 @@ import {
   PanelRightOpenIcon,
   MonitorPlayIcon,
 } from "lucide-react";
+import { FeatureErrorBoundary } from "@/components/ErrorBoundary";
 
 const Page = () => {
   const leftPanelRef = useRef<ImperativePanelHandle>(null);
@@ -96,11 +97,17 @@ const Page = () => {
                 <Badge variant="default" className="w-fit text-[10px]">
                   Variables
                 </Badge>
-                <VariableContainer />
+                <FeatureErrorBoundary featureName="Variables">
+                  <VariableContainer />
+                </FeatureErrorBoundary>
                 <hr className="border-border" />
-                <DataTypeContainer />
+                <FeatureErrorBoundary featureName="Data Types">
+                  <DataTypeContainer />
+                </FeatureErrorBoundary>
                 <hr className="border-border" />
-                <FunctionsContainer />
+                <FeatureErrorBoundary featureName="Functions">
+                  <FunctionsContainer />
+                </FeatureErrorBoundary>
               </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
@@ -172,7 +179,9 @@ const Page = () => {
                     "animate-in fade-in duration-300 delay-100",
                   )}
                 >
-                  <FunctionDefiner />
+                  <FeatureErrorBoundary featureName="Function Definer">
+                    <FunctionDefiner />
+                  </FeatureErrorBoundary>
                 </div>
               </div>
             </ResizablePanel>
@@ -200,7 +209,9 @@ const Page = () => {
                     <Badge variant="default" className="w-fit text-[10px]">
                       Runner Flow
                     </Badge>
-                    <RunnerDefiner />
+                    <FeatureErrorBoundary featureName="Runner">
+                      <RunnerDefiner />
+                    </FeatureErrorBoundary>
                   </div>
                 </ResizablePanel>
                 <ResizableHandle withHandle />
@@ -221,10 +232,12 @@ const Page = () => {
                       "animate-in fade-in slide-in-from-right-4 duration-300 delay-200",
                     )}
                   >
-                    <CodeDetail
-                      onToggle={toggleCodeDetail}
-                      isCollapsed={codeDetailCollapsed}
-                    />
+                    <FeatureErrorBoundary featureName="Code Detail">
+                      <CodeDetail
+                        onToggle={toggleCodeDetail}
+                        isCollapsed={codeDetailCollapsed}
+                      />
+                    </FeatureErrorBoundary>
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>

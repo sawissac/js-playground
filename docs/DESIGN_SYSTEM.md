@@ -1,8 +1,287 @@
-# Design System
+# JS Playground — Design System & Architecture Documentation
 
-A rounded, minimal component library built with Tailwind CSS 4, CVA, and Radix UI primitives.
+> **Visual Logic Editor for the Modern Web**
+>
+> A sophisticated visual programming environment for designing state diagrams, managing contextual variables dynamically, and exporting robust JSON package footprints—all with a modern, accessible UI.
 
-## Design Principles
+---
+
+## Table of Contents
+
+1. [Project Overview](#project-overview)
+2. [Architecture](#architecture)
+3. [State Management](#state-management)
+4. [Feature Modules](#feature-modules)
+5. [Design System](#design-system)
+6. [Components](#components)
+7. [Technical Stack](#technical-stack)
+
+---
+
+## Project Overview
+
+### Purpose
+
+JS Playground is a **Turing-complete visual programming environment** that enables users to:
+
+- Define variables with typed values (string, number, boolean, array, object)
+- Create reusable functions with action pipelines
+- Build execution flows (runners) with conditional logic and loops
+- Execute code with async/await support and CDN library integration
+- Visualize data flow with interactive D3.js charts
+- Export/import project configurations as JSON
+- Manage multiple packages within a single project
+
+### Key Features
+
+- **React-Powered**: Built entirely with React 19 and Redux Toolkit for blazing-fast rendering
+- **Turing Complete**: Supports looping, conditionals, cross-function mutations, and async execution
+- **Extensible**: Dynamic CDN package loading (d3, lodash, three.js, etc.)
+- **Visual**: Interactive flow charts with drag-and-drop node positioning
+- **Type-Safe**: UUID-based entity management with TypeScript throughout
+- **Modern UI**: Rounded, minimal design system with Tailwind CSS 4 and Radix UI
+
+---
+
+## Architecture
+
+### High-Level Structure
+
+```
+src/
+├── app/              # Next.js 15 App Router
+│   ├── page.tsx      # Landing page
+│   ├── editor/       # Main editor workspace
+│   ├── layout.tsx    # Root layout with Redux provider
+│   └── globals.css   # Tailwind CSS 4 theme & tokens
+├── components/       # Reusable UI components (shadcn/ui)
+│   └── ui/          # Button, Badge, Input, Dialog, etc.
+├── features/        # Feature-based modules
+│   ├── variable-container/
+│   ├── functions-container/
+│   ├── function-definer/
+│   ├── runner-definer/
+│   ├── code-detail/
+│   ├── renderer/
+│   └── ...
+├── state/           # Redux Toolkit state management
+│   ├── slices/
+│   │   ├── editorSlice.ts
+│   │   └── logSlice.ts
+│   ├── store.ts
+│   ├── types.ts
+│   └── hooks.ts
+├── hooks/           # Custom React hooks
+│   └── useRunner.ts  # Execution engine
+├── lib/             # Utility functions
+│   ├── function-utils.ts  # Function execution engine
+│   └── utils.ts          # Class name merger (cn)
+└── constants/       # Type definitions and action templates
+```
+
+### Design Patterns
+
+1. **Feature-Based Architecture**: Each major feature is self-contained in its own folder
+2. **Redux Toolkit Slices**: Centralized state with immutable updates using Immer
+3. **Custom Hooks**: Business logic extracted into reusable hooks (`useRunner`)
+4. **UUID-Based Identities**: All entities use UUIDs for uniqueness and state management
+5. **Token System**: Variable references use `@token` syntax for dynamic resolution
+6. **Deep Cloning**: Immutable state operations with structured cloning
+7. **Async Execution**: AsyncFunction constructor for dynamic code execution
+8. **CDN Injection**: Dynamic script loading with global namespace detection
+
+### Data Flow
+
+```
+User Interaction → Component → Redux Action → Reducer → State Update → Re-render
+                                                    ↓
+                                            LocalForage Persistence (optional)
+```
+
+---
+
+## State Management
+
+### Redux Store Structure
+
+```typescript
+RootState {
+  editor: EditorState {
+    projectId: string
+    projectName: string
+    activePackageId: string
+    dataTypes: string[]
+    packages: Package[] {
+      id: string
+      name: string
+      enabled: boolean
+      variables: VariableInterface[]
+      functions: FunctionInterface[]
+      runner: Runner[]
+      codeSnippets: CodeSnippetInterface[]
+      cdnPackages: CdnPackage[]
+    }
+  }
+  log: LogState {
+    logs: LogEntry[]
+  }
+}
+```
+
+### Key Interfaces
+
+**VariableInterface**
+```typescript
+{
+  id: string        // UUID v4
+  name: string      // User-defined variable name
+  type: string      // "string" | "number" | "boolean" | "array" | "object"
+  value: any        // Typed value
+}
+```
+
+**FunctionInterface**
+```typescript
+{
+  id: string
+  name: string
+  dataType: string              // Return type (inferred from last action)
+  actions: FunctionActionInterface[]
+}
+```
+
+**FunctionActionInterface**
+```typescript
+{
+  id: string
+  name: string                  // "temp" | "use" | "math" | "code" | "when" | "loop"
+  dataType: string
+  value: any
+  codeName?: string            // User-defined name for code blocks
+  subActions?: FunctionActionInterface[]  // Nested actions for conditionals/loops
+  loopParams?: { start, end, step }       // Loop iteration parameters
+}
+```
+
+**Runner**
+```typescript
+{
+  id: string
+  type: "set" | "call" | "code"
+  target: [string, string]     // [variableName, functionName | value]
+  args: any[]
+  code?: string                // Raw JavaScript code for "code" type
+}
+```
+
+### EditorSlice Actions
+
+**Project & Package Management**
+- `setProjectName`, `addPackage`, `removePackage`, `renamePackage`
+- `setActivePackage`, `togglePackageEnabled`, `reorderPackages`
+- `importProject`, `importPackage`, `resetState`
+
+**Variable Management**
+- `addVariable`, `removeVariable`, `updateVariable`, `updateVariableValue`
+- `updateDataType`, `setVariables`
+
+**Function Management**
+- `addFunctionName`, `removeFunctionName`, `updateFunctionName`
+- `addFunctionAction`, `updateFunctionAction`, `removeFunctionAction`
+- `reorderFunctionActions`
+
+**Conditional & Loop Actions**
+- `addWhenSubAction`, `removeWhenSubAction`, `updateWhenSubAction`, `reorderWhenSubActions`
+- `addLoopSubAction`, `removeLoopSubAction`, `updateLoopSubAction`, `updateLoopParams`
+
+**Runner Management**
+- `createSetRunner`, `createCallRunner`, `createCodeRunner`
+- `updateRunner`, `removeRunner`, `reorderRunnerSteps`
+
+**Code Snippets & CDN**
+- `addCodeSnippet`, `updateCodeSnippet`, `removeCodeSnippet`
+- `addCdnPackage`, `removeCdnPackage`, `toggleCdnPackage`, `updateCdnPackage`
+
+---
+
+## Feature Modules
+
+### 1. Variable Container
+**Location**: `src/features/variable-container/`
+
+- Displays all variables in the active package
+- Allows adding, removing, and renaming variables
+- Shows variable types with color-coded badges
+- Integrated with data type selection
+
+### 2. Data Type Container
+**Location**: `src/features/data-type-container/`
+
+- Provides data type templates (string, number, boolean, array, object)
+- Drag-and-drop or click to assign types to variables
+- Color-coded type badges for visual clarity
+
+### 3. Functions Container
+**Location**: `src/features/functions-container/`
+
+- Lists all functions in the active package
+- Allows creating, renaming, and deleting functions
+- Shows function return types (inferred from actions)
+- Selection mechanism for editing in Function Definer
+
+### 4. Function Definer
+**Location**: `src/features/function-definer/`
+
+- Multi-step action pipeline builder
+- Supports action types: temp, use, math, code, when, loop
+- Nested sub-actions for conditionals and loops
+- Drag-and-drop reordering with visual feedback
+- CodeMirror integration for JavaScript code blocks
+
+### 5. Runner Definer
+**Location**: `src/features/runner-definer/`
+
+- Execution flow builder with three step types:
+  - **Set**: Assign static values to variables
+  - **Call**: Execute function and assign result
+  - **Code**: Run inline JavaScript and assign result
+- Drag-and-drop step reordering
+- Visual step validation
+
+### 6. Code Detail Panel
+**Location**: `src/features/code-detail/`
+
+**Five Tabs**:
+
+1. **Code Preview**: Live generated JavaScript code view
+2. **Objects**: Editable variable cards with inline type/value editing
+3. **Flow Chart**: Interactive D3.js visualization with drag/zoom/pan
+4. **Export Preview**: JSON export preview with syntax highlighting
+5. **Log**: Execution logs with timestamps and context
+
+### 7. Renderer Dialog
+**Location**: `src/features/renderer/`
+
+- Full-screen modal with render area and controls
+- Package management (enable/disable, reorder)
+- CDN package management (predefined + custom)
+- Execution button with validation
+- Prompt dialog for AI-assisted code generation
+- Real-time DOM rendering with element ID access
+
+### 8. Project Sidebar
+**Location**: `src/features/project-sidebar/`
+
+- Project name editing
+- Package switcher
+- Import/Export functionality
+- Help modal
+
+---
+
+## Design System
+
+### Design Principles
 
 - **Rounded** — pill shapes (`rounded-full`) for interactive elements; soft containers (`rounded-xl`, `rounded-2xl`) for panels.
 - **Minimal** — clean surfaces, subtle shadows, and small text sizes to reduce visual clutter.
@@ -566,3 +845,199 @@ import { cn } from "@/lib/utils"
 
 cn("rounded-full bg-primary", isActive && "bg-accent", className)
 ```
+
+---
+
+## Technical Stack
+
+### Core Framework
+- **Next.js 15.5.9**: App Router with Turbopack for fast development
+- **React 19.1.0**: Latest React with enhanced performance
+- **TypeScript 5**: Type-safe development
+
+### State Management
+- **Redux Toolkit 2.9.0**: Predictable state container with Immer
+- **react-redux 9.2.0**: Official React bindings
+- **localforage 1.10.0**: Async browser storage (IndexedDB/WebSQL/localStorage)
+
+### UI Framework
+- **Tailwind CSS 4**: Utility-first CSS with CSS variables
+- **Radix UI**: Unstyled, accessible component primitives
+- **class-variance-authority 0.7.1**: CVA for variant management
+- **tailwind-merge 3.3.1**: Intelligent Tailwind class merging
+- **Lucide React 0.544.0**: Icon library
+- **@tabler/icons-react 3.34.1**: Additional icon set
+
+### Code Editor
+- **CodeMirror 6**: Modern code editor with JavaScript language support
+- **@codemirror/lang-javascript 6.2.5**: JavaScript syntax highlighting
+- **@codemirror/autocomplete 6.20.1**: Intelligent code completion
+
+### Visualization
+- **D3.js 7.9.0**: Data-driven visualizations and flow charts
+- **react-resizable-panels 3.0.5**: Resizable panel layouts
+
+### Utilities
+- **mathjs 14.7.0**: Mathematical expression evaluation
+- **uuid 13.0.0**: UUID v4 generation for entity identification
+- **clsx 2.1.1**: Conditional class name utility
+
+### Development Tools
+- **@tailwindcss/postcss**: Tailwind CSS 4 PostCSS plugin
+- **tw-animate-css 1.3.8**: Animation utilities
+
+---
+
+## Execution Engine
+
+### Token System
+
+The application uses a token-based variable reference system:
+
+**Special Tokens**:
+- `@this` / `@t`: Current value being processed
+- `@space` / `@s`: Space character
+- `@comma` / `@c`: Comma character
+- `@empty` / `@e`: Empty string
+
+**Dynamic Tokens**:
+- `@arg1`, `@arg2`, ...: Function arguments (1-indexed)
+- `@temp1`, `@temp2`, ...: Temporary variables from "temp" actions
+- `@math1`, `@math2`, ...: Results from "math" actions
+- `@pick(1)`, `@pick(2)`, ...: Step results (1-indexed)
+
+**Property Access**:
+- `@this.length`: Access properties on tokens
+- `@arg1.name.first`: Nested property access
+
+### Function Execution Flow
+
+1. **Token Resolution**: Replace `@token` references with actual values
+2. **Action Pipeline**: Execute actions sequentially (temp → use → math → code → when → loop)
+3. **CDN Injection**: Load CDN libraries and inject into execution context
+4. **Async Execution**: Use AsyncFunction constructor for code blocks
+5. **Result Assignment**: Update variable values with results
+
+### CDN Package Loading
+
+```typescript
+// Sanitize CDN names to valid JS identifiers
+const sanitizeCdnName = (name: string) => 
+  name.replace(/[^a-zA-Z0-9_$]/g, "_").replace(/^[0-9]/, "_$&");
+
+// Load scripts dynamically
+const script = document.createElement("script");
+script.src = cdnUrl;
+script.onload = () => resolve();
+document.head.appendChild(script);
+
+// Access via window object
+const d3 = window.d3;
+```
+
+### Code Block Execution
+
+```typescript
+// Transform @token syntax to __ctx__ access
+code = code.replace(/@(\w+(?:\.\w+)*)/g, (_match, token) => {
+  const dotIndex = token.indexOf(".");
+  if (dotIndex === -1) return `__ctx__["${token}"]`;
+  const base = token.slice(0, dotIndex);
+  const rest = token.slice(dotIndex);
+  return `__ctx__["${base}"]${rest}`;
+});
+
+// Create async function with context
+const fn = new AsyncFunction(
+  "__ctx__",      // Token context
+  ...cdnParamNames,  // CDN libraries (d3, lodash, etc.)
+  ...safeVarNames,   // Safe variable names
+  code            // Transformed code
+);
+
+// Execute with values
+const result = await fn(tokenCtx, ...cdnParamValues, ...safeVarValues);
+```
+
+---
+
+## Security Considerations
+
+### Code Execution
+- Uses `AsyncFunction` constructor (similar to `eval`) for dynamic execution
+- **Client-side only**: All code runs in the user's browser
+- No server-side execution or API endpoints
+- Users must trust their own code and imported packages
+
+### CDN Loading
+- Scripts loaded from user-specified URLs (jsDelivr, unpkg, etc.)
+- Global namespace pollution possible
+- Users should verify CDN sources
+
+### Data Persistence
+- LocalForage for browser-based storage
+- No cloud sync or server storage
+- Export/import via JSON for backup
+
+---
+
+## Performance Optimizations
+
+1. **Deep Cloning**: Structured clone for immutable state operations
+2. **UUID Indexing**: Fast lookups using UUID-based maps
+3. **Lazy Loading**: D3.js loaded dynamically only when needed
+4. **Memoization**: React hooks with proper dependency arrays
+5. **Virtual Scrolling**: Considered for large lists (not yet implemented)
+6. **Code Splitting**: Next.js automatic code splitting by route
+
+---
+
+## Accessibility
+
+- **Keyboard Navigation**: Full keyboard support via Radix UI
+- **ARIA Attributes**: Proper roles, labels, and descriptions
+- **Focus Management**: Focus rings on all interactive elements
+- **Screen Readers**: Semantic HTML and ARIA for assistive tech
+- **Color Contrast**: WCAG AA compliant color combinations
+
+---
+
+## Browser Compatibility
+
+**Minimum Requirements**:
+- Modern evergreen browsers (Chrome, Firefox, Safari, Edge)
+- ES2020+ support (AsyncFunction, optional chaining, nullish coalescing)
+- IndexedDB support for persistence
+- CSS Grid and Flexbox
+
+**Tested On**:
+- Chrome 120+
+- Firefox 120+
+- Safari 17+
+- Edge 120+
+
+---
+
+## Contributing Guidelines
+
+### Code Style
+- Use TypeScript for all new code
+- Follow existing file structure patterns
+- Use functional components with hooks
+- Prefer composition over inheritance
+- Keep components small and focused
+
+### State Management
+- All state mutations through Redux actions
+- Use UUID for entity identification
+- Deep clone when mutating complex objects
+- Add JSDoc comments for complex logic
+
+### Component Guidelines
+- Use shadcn/ui components when possible
+- Extract reusable logic into custom hooks
+- Keep inline styles minimal (prefer Tailwind)
+- Add loading and error states
+- Test with various data scenarios
+
+---
