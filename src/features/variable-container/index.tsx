@@ -69,7 +69,9 @@ const InstructionPanel = () => {
             <li>
               <code className="bg-blue-100 px-1 rounded">x(1-2):number</code>
               {" → "}
-              <code className="bg-blue-100 px-1 rounded">x1:number, x2:number</code>
+              <code className="bg-blue-100 px-1 rounded">
+                x1:number, x2:number
+              </code>
             </li>
             <li>
               <kbd className="bg-blue-100 px-1 rounded">Alt/Cmd/Ctrl+1</kbd>{" "}
@@ -85,7 +87,11 @@ const InstructionPanel = () => {
 
 const DataTypeContainer = () => {
   const dispatch = useAppDispatch();
-  const variables = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.variables);
+  const variables = useAppSelector(
+    (state) =>
+      state.editor.packages.find((p) => p.id === state.editor.activePackageId)!
+        .variables,
+  );
   const dataTypes = useAppSelector((state) => state.editor.dataTypes);
   const [oldVariable, setOldVariable] = useState("");
   const [newVariable, setNewVariable] = useState("");
@@ -245,13 +251,16 @@ const DataTypeContainer = () => {
     setNewVariable(val);
 
     // Range preview: show expanded names when any segment has name(n-m) pattern
-    const hasRange = val.split(",").some((seg) =>
-      /^[^(]+\(\d+-\d+\).*$/.test(seg.trim()),
-    );
+    const hasRange = val
+      .split(",")
+      .some((seg) => /^[^(]+\(\d+-\d+\).*$/.test(seg.trim()));
     if (hasRange) {
       const expanded = expandRanges(val);
       setRangePreview(
-        expanded.split(",").map((s) => s.trim()).filter(Boolean),
+        expanded
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
       );
       setTypeSuggestions(null);
       return;
@@ -300,9 +309,8 @@ const DataTypeContainer = () => {
   return (
     <div
       className={cn(
-        "w-full p-2 shadow-sm shadow-slate-200 rounded-md space-y-1.5",
-        "border border-slate-200 transition-all duration-200",
-        "hover:shadow-md hover:border-slate-300",
+        "w-full shadow-slate-200 rounded-md space-y-1.5",
+        " transition-all duration-200",
       )}
     >
       <InstructionPanel />

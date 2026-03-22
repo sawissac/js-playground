@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { EditorView, keymap } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { javascript } from "@codemirror/lang-javascript";
@@ -10,6 +10,11 @@ import {
   CompletionContext,
 } from "@codemirror/autocomplete";
 import { basicSetup } from "codemirror";
+import { lintCode } from "@/lib/codeLinting";
+import { formatCode } from "@/lib/codeFormatting";
+import { CodeLintBadge } from "@/components/CodeLintWarnings";
+import { Button } from "@/components/ui/button";
+import { IconWand, IconAlertTriangle } from "@tabler/icons-react";
 
 interface CodeEditorProps {
   value: string;
@@ -27,6 +32,7 @@ export const CodeEditor = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
+  const [lintResults, setLintResults] = useState(() => lintCode(value));
   const tokensRef = useRef(tokens);
   const variablesRef = useRef(variables);
 
@@ -80,7 +86,10 @@ export const CodeEditor = ({
         ]),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
-            onChangeRef.current(update.state.doc.toString());
+            const newCode = update.state.doc.toString();
+            onChangeRef.current(newCode);
+            // Lint code on change
+            setLintResults(lintCode(newCode));
           }
         }),
         EditorView.theme({
@@ -139,10 +148,46 @@ export const CodeEditor = ({
     }
   }, [value]);
 
+  const handleFormat = async () => {
+    try {
+      const formatted = await formatCode(value, {
+        indentSize: 2,
+        semicolons: true,
+        singleQuotes: false,
+      });
+      onChange(formatted);
+    } catch (error) {
+      console.error("Format error:", error);
+    }
+  };
+
   return (
-    <div
-      ref={containerRef}
-      className="border rounded-md overflow-hidden"
-    />
+    <div className="space-y-1.5">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-2 px-2 py-1 bg-slate-50 border border-slate-200 rounded-md">
+        <div className="flex items-center gap-2">
+          <CodeLintBadge issues={lintResults.issues} />
+          {lintResults.hasWarnings && (
+            <span className="text-[9px] text-amber-600 flex items-center gap-1">
+              <IconAlertTriangle size={10} />
+              Check code quality
+            </span>
+          )}
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 px-2 text-[10px] gap-1"
+          onClick={handleFormat}
+          title="Format code (Ctrl+Shift+F)"
+        >
+          <IconWand size={12} />
+          Format
+        </Button>
+      </div>
+
+      {/* Editor */}
+      <div ref={containerRef} className="border rounded-md overflow-hidden" />
+    </div>
   );
 };

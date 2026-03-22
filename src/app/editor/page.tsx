@@ -25,8 +25,25 @@ import {
   MonitorPlayIcon,
 } from "lucide-react";
 import { FeatureErrorBoundary } from "@/components/ErrorBoundary";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { SearchDialog } from "@/components/SearchDialog";
+import { KeyboardShortcutsDialog } from "@/components/KeyboardShortcutsDialog";
+import {
+  TutorialHints,
+  useTutorialHints,
+  TutorialHint,
+} from "@/components/TutorialHints";
+import { useAppDispatch, useAppSelector } from "@/state/hooks";
+import { addPackage, addVariable } from "@/state/slices/editorSlice";
+import {
+  IconKeyboard,
+  IconSearch as IconSearchIcon,
+} from "@tabler/icons-react";
+import { v4 as uuidv4 } from "uuid";
 
 const Page = () => {
+  const dispatch = useAppDispatch();
+  const packages = useAppSelector((state) => state.editor.packages);
   const leftPanelRef = useRef<ImperativePanelHandle>(null);
   const rightPanelRef = useRef<ImperativePanelHandle>(null);
   const [leftCollapsed, setLeftCollapsed] = React.useState(true);
@@ -34,6 +51,9 @@ const Page = () => {
   const [rendererOpen, setRendererOpen] = useState(false);
   const codeDetailPanelRef = useRef<ImperativePanelHandle>(null);
   const [codeDetailCollapsed, setCodeDetailCollapsed] = React.useState(true);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const { dismissedHints, dismissHint } = useTutorialHints();
 
   useEffect(() => {
     // Auto-collapse panels on mount
@@ -69,10 +89,61 @@ const Page = () => {
     else panel.collapse();
   };
 
+  const tutorialHints: TutorialHint[] = [
+    {
+      id: "welcome",
+      title: "👋 Welcome to JS Playground!",
+      description:
+        "Start by creating variables, functions, and runners to build your interactive JavaScript projects.",
+      action: {
+        label: "Add Variable",
+        onClick: () => {
+          dispatch(addVariable({ id: uuidv4(), name: "myVar" }));
+          dismissHint("welcome");
+        },
+      },
+    },
+  ].filter((hint) => !dismissedHints.has(hint.id));
+
+  const shortcuts = [
+    {
+      key: "k",
+      ctrl: true,
+      description: "Open search",
+      handler: () => setSearchOpen(true),
+    },
+    {
+      key: "/",
+      ctrl: true,
+      description: "Show keyboard shortcuts",
+      handler: () => setShortcutsOpen(true),
+    },
+    {
+      key: "r",
+      ctrl: true,
+      description: "Open renderer",
+      handler: () => setRendererOpen(true),
+    },
+    {
+      key: "[",
+      ctrl: true,
+      description: "Toggle left panel",
+      handler: toggleLeft,
+    },
+    {
+      key: "]",
+      ctrl: true,
+      description: "Toggle right panel",
+      handler: toggleRight,
+    },
+  ];
+
+  useKeyboardShortcuts({ shortcuts });
+
   return (
     <div className="flex flex-col w-full h-[100dvh] overflow-hidden">
       {/* Top Application Bar */}
-      <ProjectSidebar />
+      <ProjectSidebar onSearchClick={() => setSearchOpen(true)} />
 
       <div className="flex-1 w-full overflow-hidden">
         <div className="w-full h-full">
@@ -247,6 +318,17 @@ const Page = () => {
       </div>
 
       <RendererDialog open={rendererOpen} onOpenChange={setRendererOpen} />
+      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <KeyboardShortcutsDialog
+        open={shortcutsOpen}
+        onOpenChange={setShortcutsOpen}
+        shortcuts={shortcuts}
+      />
+      <TutorialHints
+        hints={tutorialHints}
+        onDismiss={dismissHint}
+        position="bottom"
+      />
     </div>
   );
 };

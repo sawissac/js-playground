@@ -26,6 +26,7 @@ import {
   IconX,
   IconDeviceFloppy,
   IconRefresh,
+  IconSearch,
 } from "@tabler/icons-react";
 import { addLog } from "@/state/slices/logSlice";
 import { Package } from "@/state/types";
@@ -36,12 +37,18 @@ import {
   validateProjectExport,
 } from "@/lib/projectValidation";
 import { auditLog } from "@/lib/securityAudit";
+import { useDialog } from "@/hooks/useDialog";
 
 const LOCAL_STORAGE_KEY = "js_playground_project_save";
 
-const ProjectSidebar = () => {
+interface ProjectSidebarProps {
+  onSearchClick?: () => void;
+}
+
+const ProjectSidebar = ({ onSearchClick }: ProjectSidebarProps = {}) => {
   const dispatch = useAppDispatch();
   const editorState = useAppSelector((state) => state.editor);
+  const dialog = useDialog();
 
   const packageFileInputRef = useRef<HTMLInputElement>(null);
   const projectFileInputRef = useRef<HTMLInputElement>(null);
@@ -107,7 +114,7 @@ const ProjectSidebar = () => {
     );
   };
 
-  const handleRemovePackage = (
+  const handleRemovePackage = async (
     id: string,
     name: string,
     e: React.MouseEvent,
@@ -123,13 +130,22 @@ const ProjectSidebar = () => {
       );
       return;
     }
-    if (confirm(`Are you sure you want to delete package "${name}"?`)) {
+    const confirmed = await dialog.confirm(
+      `Are you sure you want to delete package "${name}"?`,
+      {
+        title: "Delete Package",
+        confirmText: "Delete",
+        cancelText: "Cancel",
+      },
+    );
+
+    if (confirmed) {
       dispatch(removePackage(id));
       dispatch(
         addLog({
           type: "info",
-          message: `Deleted package: ${name}`,
-          context: "project",
+          message: `Package "${name}" deleted`,
+          context: "package",
         }),
       );
     }
@@ -273,7 +289,7 @@ const ProjectSidebar = () => {
     if (packageFileInputRef.current) packageFileInputRef.current.value = "";
   };
 
-  const handleExportProject = () => {
+  const handleExportProject = async () => {
     try {
       const validation = validateProjectExport(editorState);
 
@@ -285,7 +301,13 @@ const ProjectSidebar = () => {
             context: "export",
           }),
         );
-        alert(`Cannot export project:\n\n${validation.errors.join("\n")}`);
+        dialog.alert(
+          `Cannot export project:\n\n${validation.errors.join("\n")}`,
+          {
+            type: "error",
+            title: "Export Failed",
+          },
+        );
         return;
       }
 
@@ -298,8 +320,14 @@ const ProjectSidebar = () => {
           }),
         );
 
-        const proceed = confirm(
-          `⚠️ Security warnings detected:\n\n${validation.warnings.join("\n")}\n\nProceed with export?`,
+        const proceed = await dialog.confirm(
+          `Security warnings detected:\n\n${validation.warnings.join("\n")}\n\nProceed with export?`,
+          {
+            type: "warning",
+            title: "Export Warning",
+            confirmText: "Export Anyway",
+            cancelText: "Cancel",
+          },
         );
         if (!proceed) return;
       }
@@ -345,7 +373,7 @@ const ProjectSidebar = () => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const jsonString = e.target?.result as string;
         const validation = validateProjectImport(jsonString);
@@ -358,8 +386,12 @@ const ProjectSidebar = () => {
               context: "import",
             }),
           );
-          alert(
-            `❌ Cannot import project:\n\n${validation.errors.join("\n")}\n\nPlease fix these issues and try again.`,
+          dialog.alert(
+            `Cannot import project:\n\n${validation.errors.join("\n")}\n\nPlease fix these issues and try again.`,
+            {
+              type: "error",
+              title: "Import Failed",
+            },
           );
           auditLog.projectImport(false, { errors: validation.errors });
           return;
@@ -379,8 +411,14 @@ const ProjectSidebar = () => {
               ? `${validation.warnings.slice(0, 5).join("\n")}\n... and ${validation.warnings.length - 5} more warnings`
               : validation.warnings.join("\n");
 
-          const proceed = confirm(
-            `⚠️ Security warnings detected:\n\n${warningMessage}\n\nProceed with import?`,
+          const proceed = await dialog.confirm(
+            `Security warnings detected:\n\n${warningMessage}\n\nProceed with import?`,
+            {
+              type: "warning",
+              title: "Import Warning",
+              confirmText: "Import Anyway",
+              cancelText: "Cancel",
+            },
           );
           if (!proceed) {
             auditLog.projectImport(false, {
@@ -437,6 +475,27 @@ const ProjectSidebar = () => {
             Workspace
           </Badge>
           <div className="flex gap-1 ml-4 md:flex items-center">
+            {onSearchClick && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 px-2 text-xs gap-1.5 hover:bg-blue-50 hover:border-blue-300 transition-all"
+                  onClick={onSearchClick}
+                >
+                  <IconSearch size={14} />
+                  <span className="hidden sm:inline">Search</span>
+                  <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono bg-slate-100 border border-slate-300 rounded">
+                    {typeof navigator !== "undefined" &&
+                    navigator.platform?.includes("Mac")
+                      ? "⌘"
+                      : "Ctrl"}
+                    K
+                  </kbd>
+                </Button>
+                <div className="w-px h-4 bg-slate-200 mx-1" />
+              </>
+            )}
             <Button
               size="icon"
               variant="ghost"

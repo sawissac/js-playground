@@ -68,7 +68,11 @@ const InstructionPanel = () => {
 
 const FunctionsContainer = () => {
   const dispatch = useAppDispatch();
-  const functions = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.functions);
+  const functions = useAppSelector(
+    (state) =>
+      state.editor.packages.find((p) => p.id === state.editor.activePackageId)!
+        .functions,
+  );
   const [oldFunctionName, setOldFunctionName] = useState("");
   const [newFunctionName, setNewFunctionName] = useState("");
   const [isEditing, setIsEditing] = useState(false);
@@ -166,9 +170,8 @@ const FunctionsContainer = () => {
   return (
     <div
       className={cn(
-        "w-full p-2 shadow-sm shadow-slate-200 rounded-md space-y-1.5",
-        "border border-slate-200 transition-all duration-200",
-        "hover:shadow-md hover:border-slate-300",
+        "w-fullrounded-md space-y-1.5",
+        "transition-all duration-200",
       )}
     >
       <InstructionPanel />

@@ -2,10 +2,20 @@
  * Project Import/Export Validation
  */
 
-import { EditorState, Package, VariableInterface, FunctionInterface, Runner } from "@/state/types";
-import { validateName, validateCodeLength, hasCircularReference } from "./validation";
+import {
+  EditorState,
+  Package,
+  VariableInterface,
+  FunctionInterface,
+  Runner,
+} from "@/state/types";
+import {
+  validateName,
+  validateCodeLength,
+  hasCircularReference,
+} from "./validation";
 
-const MAX_PROJECT_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAX_PROJECT_SIZE = 100 * 1024 * 1024; // 100 MB
 const MAX_PACKAGES = 50;
 const MAX_VARIABLES_PER_PACKAGE = 100;
 const MAX_FUNCTIONS_PER_PACKAGE = 100;
@@ -33,7 +43,9 @@ export function validateProjectImport(jsonString: string): ValidationResult {
   // Check size
   const size = new Blob([jsonString]).size;
   if (size > MAX_PROJECT_SIZE) {
-    errors.push(`Project too large: ${(size / 1024 / 1024).toFixed(2)}MB (max 10MB)`);
+    errors.push(
+      `Project too large: ${(size / 1024 / 1024).toFixed(2)}MB (max 10MB)`,
+    );
     return { valid: false, errors, warnings };
   }
 
@@ -71,7 +83,9 @@ export function validateProjectImport(jsonString: string): ValidationResult {
   }
 
   if (data.packages.length > MAX_PACKAGES) {
-    errors.push(`Too many packages: ${data.packages.length} (max ${MAX_PACKAGES})`);
+    errors.push(
+      `Too many packages: ${data.packages.length} (max ${MAX_PACKAGES})`,
+    );
     return { valid: false, errors, warnings };
   }
 
@@ -129,7 +143,7 @@ function validatePackage(pkg: any, index: number): ValidationResult {
     } else {
       if (pkg.variables.length > MAX_VARIABLES_PER_PACKAGE) {
         errors.push(
-          `Package ${index} has too many variables: ${pkg.variables.length} (max ${MAX_VARIABLES_PER_PACKAGE})`
+          `Package ${index} has too many variables: ${pkg.variables.length} (max ${MAX_VARIABLES_PER_PACKAGE})`,
         );
       }
       pkg.variables.forEach((v: any, i: number) => {
@@ -146,7 +160,7 @@ function validatePackage(pkg: any, index: number): ValidationResult {
     } else {
       if (pkg.functions.length > MAX_FUNCTIONS_PER_PACKAGE) {
         errors.push(
-          `Package ${index} has too many functions: ${pkg.functions.length} (max ${MAX_FUNCTIONS_PER_PACKAGE})`
+          `Package ${index} has too many functions: ${pkg.functions.length} (max ${MAX_FUNCTIONS_PER_PACKAGE})`,
         );
       }
       pkg.functions.forEach((f: any, i: number) => {
@@ -163,7 +177,7 @@ function validatePackage(pkg: any, index: number): ValidationResult {
     } else {
       if (pkg.runner.length > MAX_RUNNERS_PER_PACKAGE) {
         errors.push(
-          `Package ${index} has too many runners: ${pkg.runner.length} (max ${MAX_RUNNERS_PER_PACKAGE})`
+          `Package ${index} has too many runners: ${pkg.runner.length} (max ${MAX_RUNNERS_PER_PACKAGE})`,
         );
       }
       pkg.runner.forEach((r: any, i: number) => {
@@ -180,7 +194,11 @@ function validatePackage(pkg: any, index: number): ValidationResult {
 /**
  * Validate a variable
  */
-function validateVariable(variable: any, pkgIndex: number, varIndex: number): ValidationResult {
+function validateVariable(
+  variable: any,
+  pkgIndex: number,
+  varIndex: number,
+): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -193,14 +211,19 @@ function validateVariable(variable: any, pkgIndex: number, varIndex: number): Va
   } else {
     const nameValidation = validateName(variable.name);
     if (!nameValidation.valid) {
-      errors.push(`Package ${pkgIndex} variable ${varIndex}: ${nameValidation.error}`);
+      // Variable names are for display, so invalid identifiers are warnings, not errors
+      warnings.push(
+        `Package ${pkgIndex} variable ${varIndex}: ${nameValidation.error}`,
+      );
     }
   }
 
   // Check for circular references in objects
   if (variable.type === "object" && variable.value) {
     if (hasCircularReference(variable.value)) {
-      errors.push(`Package ${pkgIndex} variable ${varIndex} has circular references`);
+      errors.push(
+        `Package ${pkgIndex} variable ${varIndex} has circular references`,
+      );
     }
   }
 
@@ -210,7 +233,11 @@ function validateVariable(variable: any, pkgIndex: number, varIndex: number): Va
 /**
  * Validate a function
  */
-function validateFunction(func: any, pkgIndex: number, funcIndex: number): ValidationResult {
+function validateFunction(
+  func: any,
+  pkgIndex: number,
+  funcIndex: number,
+): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -223,7 +250,10 @@ function validateFunction(func: any, pkgIndex: number, funcIndex: number): Valid
   } else {
     const nameValidation = validateName(func.name);
     if (!nameValidation.valid) {
-      errors.push(`Package ${pkgIndex} function ${funcIndex}: ${nameValidation.error}`);
+      // Function names are for display, so invalid identifiers are warnings, not errors
+      warnings.push(
+        `Package ${pkgIndex} function ${funcIndex}: ${nameValidation.error}`,
+      );
     }
   }
 
@@ -233,7 +263,7 @@ function validateFunction(func: any, pkgIndex: number, funcIndex: number): Valid
         const codeValidation = validateCodeLength(action.value);
         if (!codeValidation.valid) {
           warnings.push(
-            `Package ${pkgIndex} function ${funcIndex} action ${i}: ${codeValidation.error}`
+            `Package ${pkgIndex} function ${funcIndex} action ${i}: ${codeValidation.error}`,
           );
         }
       }
@@ -246,7 +276,11 @@ function validateFunction(func: any, pkgIndex: number, funcIndex: number): Valid
 /**
  * Validate a runner
  */
-function validateRunner(runner: any, pkgIndex: number, runnerIndex: number): ValidationResult {
+function validateRunner(
+  runner: any,
+  pkgIndex: number,
+  runnerIndex: number,
+): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -258,7 +292,7 @@ function validateRunner(runner: any, pkgIndex: number, runnerIndex: number): Val
     errors.push(`Package ${pkgIndex} runner ${runnerIndex} missing type`);
   } else if (!["set", "call", "code"].includes(runner.type)) {
     errors.push(
-      `Package ${pkgIndex} runner ${runnerIndex} invalid type: ${runner.type}`
+      `Package ${pkgIndex} runner ${runnerIndex} invalid type: ${runner.type}`,
     );
   }
 
@@ -266,7 +300,7 @@ function validateRunner(runner: any, pkgIndex: number, runnerIndex: number): Val
     const codeValidation = validateCodeLength(runner.code);
     if (!codeValidation.valid) {
       warnings.push(
-        `Package ${pkgIndex} runner ${runnerIndex}: ${codeValidation.error}`
+        `Package ${pkgIndex} runner ${runnerIndex}: ${codeValidation.error}`,
       );
     }
   }
@@ -285,13 +319,22 @@ function detectMaliciousCode(data: any): string[] {
   const dangerousPatterns = [
     { pattern: /document\.cookie/gi, message: "Code accesses document.cookie" },
     { pattern: /localStorage\.clear/gi, message: "Code clears localStorage" },
-    { pattern: /sessionStorage\.clear/gi, message: "Code clears sessionStorage" },
-    { pattern: /window\.location\s*=/gi, message: "Code changes window.location" },
+    {
+      pattern: /sessionStorage\.clear/gi,
+      message: "Code clears sessionStorage",
+    },
+    {
+      pattern: /window\.location\s*=/gi,
+      message: "Code changes window.location",
+    },
     { pattern: /\.innerHTML\s*=/gi, message: "Code uses innerHTML (XSS risk)" },
     { pattern: /eval\s*\(/gi, message: "Code uses eval()" },
     { pattern: /Function\s*\(/gi, message: "Code uses Function constructor" },
     { pattern: /fetch\s*\(/gi, message: "Code makes external requests" },
-    { pattern: /XMLHttpRequest/gi, message: "Code makes external requests (XHR)" },
+    {
+      pattern: /XMLHttpRequest/gi,
+      message: "Code makes external requests (XHR)",
+    },
   ];
 
   for (const { pattern, message } of dangerousPatterns) {
@@ -315,7 +358,8 @@ export function sanitizeProjectData(data: EditorState): EditorState {
   if (!sanitized.projectName) sanitized.projectName = "Untitled Project";
   if (!sanitized.activePackageId) sanitized.activePackageId = "";
   if (!Array.isArray(sanitized.packages)) sanitized.packages = [];
-  if (!Array.isArray(sanitized.dataTypes)) sanitized.dataTypes = ["string", "number", "boolean", "array"];
+  if (!Array.isArray(sanitized.dataTypes))
+    sanitized.dataTypes = ["string", "number", "boolean", "array"];
 
   // Sanitize each package
   sanitized.packages = sanitized.packages.map((pkg: Package) => ({

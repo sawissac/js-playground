@@ -731,21 +731,23 @@ const CodeDetail = ({
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Tab bar */}
-      <div className="flex items-center border-b border-slate-200 bg-slate-50 shrink-0">
+      {/* Tab navigation */}
+      <div className="flex items-center border-b border-slate-200 bg-slate-50 px-2 shrink-0 overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            type="button"
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              "px-4 py-2 text-xs font-medium transition-colors relative",
+              "text-xs px-3 py-2 transition-all relative whitespace-nowrap",
               activeTab === tab.id
-                ? "text-slate-900 bg-white border-b-2 border-blue-500 -mb-px"
-                : "text-slate-500 hover:text-slate-700 hover:bg-slate-100",
+                ? "text-slate-900 font-medium"
+                : "text-slate-500 hover:text-slate-700",
             )}
           >
             {tab.label}
+            {activeTab === tab.id && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
+            )}
           </button>
         ))}
         {onToggle && (

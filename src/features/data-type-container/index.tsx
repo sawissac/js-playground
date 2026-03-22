@@ -53,7 +53,11 @@ const InstructionPanel = () => {
 
 const DataTypeContainer = () => {
   const dispatch = useAppDispatch();
-  const variables = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.variables);
+  const variables = useAppSelector(
+    (state) =>
+      state.editor.packages.find((p) => p.id === state.editor.activePackageId)!
+        .variables,
+  );
   const dataTypes = useAppSelector((state) => state.editor.dataTypes);
   const [showDetail, setShowDetail] = React.useState(true);
 
@@ -65,7 +69,7 @@ const DataTypeContainer = () => {
   };
 
   return (
-    <div className="w-full p-2 shadow-md shadow-slate-200 rounded-md space-y-1.5">
+    <div className="w-full shadow-slate-200 rounded-md space-y-1.5">
       <InstructionPanel />
       <div className="flex flex-row gap-1.5 items-center">
         <Badge variant="secondary" className="text-xs py-0">
