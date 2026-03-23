@@ -14,7 +14,12 @@ import { lintCode } from "@/lib/codeLinting";
 import { formatCode } from "@/lib/codeFormatting";
 import { CodeLintBadge } from "@/components/CodeLintWarnings";
 import { Button } from "@/components/ui/button";
-import { IconWand, IconAlertTriangle } from "@tabler/icons-react";
+import {
+  IconWand,
+  IconAlertTriangle,
+  IconMaximize,
+  IconMinimize,
+} from "@tabler/icons-react";
 
 interface CodeEditorProps {
   value: string;
@@ -33,6 +38,7 @@ export const CodeEditor = ({
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const [lintResults, setLintResults] = useState(() => lintCode(value));
+  const [isExpanded, setIsExpanded] = useState(false);
   const tokensRef = useRef(tokens);
   const variablesRef = useRef(variables);
 
@@ -70,13 +76,102 @@ export const CodeEditor = ({
       };
     };
 
+    const jsGlobalsCompletion = (context: CompletionContext) => {
+      const word = context.matchBefore(/[a-zA-Z_$][\w$]*/);
+      if (!word && !context.explicit) return null;
+      if (word && word.text.startsWith("@")) return null;
+
+      const globals = [
+        { label: "console.log", type: "function", info: "Output to console" },
+        { label: "console.error", type: "function", info: "Log error message" },
+        {
+          label: "console.warn",
+          type: "function",
+          info: "Log warning message",
+        },
+        {
+          label: "document.getElementById",
+          type: "function",
+          info: "Get element by ID",
+        },
+        {
+          label: "document.querySelector",
+          type: "function",
+          info: "Query selector",
+        },
+        {
+          label: "document.querySelectorAll",
+          type: "function",
+          info: "Query all matching selectors",
+        },
+        {
+          label: "document.createElement",
+          type: "function",
+          info: "Create new element",
+        },
+        { label: "Math.random", type: "function", info: "Random number 0-1" },
+        { label: "Math.floor", type: "function", info: "Round down" },
+        { label: "Math.ceil", type: "function", info: "Round up" },
+        {
+          label: "Math.round",
+          type: "function",
+          info: "Round to nearest integer",
+        },
+        { label: "Math.abs", type: "function", info: "Absolute value" },
+        { label: "Math.max", type: "function", info: "Maximum value" },
+        { label: "Math.min", type: "function", info: "Minimum value" },
+        { label: "JSON.parse", type: "function", info: "Parse JSON string" },
+        {
+          label: "JSON.stringify",
+          type: "function",
+          info: "Convert to JSON string",
+        },
+        {
+          label: "Array.isArray",
+          type: "function",
+          info: "Check if value is array",
+        },
+        { label: "Object.keys", type: "function", info: "Get object keys" },
+        { label: "Object.values", type: "function", info: "Get object values" },
+        {
+          label: "Object.entries",
+          type: "function",
+          info: "Get key-value pairs",
+        },
+        { label: "setTimeout", type: "function", info: "Delay execution" },
+        { label: "setInterval", type: "function", info: "Repeat execution" },
+        { label: "clearTimeout", type: "function", info: "Cancel timeout" },
+        { label: "clearInterval", type: "function", info: "Cancel interval" },
+        { label: "fetch", type: "function", info: "Make HTTP request" },
+        { label: "async", type: "keyword", info: "Async function keyword" },
+        { label: "await", type: "keyword", info: "Await promise resolution" },
+        {
+          label: "return",
+          type: "keyword",
+          info: "Return value from function",
+        },
+        { label: "const", type: "keyword", info: "Constant declaration" },
+        { label: "let", type: "keyword", info: "Variable declaration" },
+        {
+          label: "var",
+          type: "keyword",
+          info: "Variable declaration (legacy)",
+        },
+      ];
+
+      return {
+        from: word ? word.from : context.pos,
+        options: globals,
+      };
+    };
+
     const state = EditorState.create({
       doc: value,
       extensions: [
         basicSetup,
         javascript(),
         autocompletion({
-          override: [tokenCompletion, variableCompletion],
+          override: [tokenCompletion, variableCompletion, jsGlobalsCompletion],
         }),
         keymap.of([
           {
@@ -102,7 +197,7 @@ export const CodeEditor = ({
           },
           ".cm-scroller": {
             overflow: "auto",
-            maxHeight: "250px",
+            minHeight: "120px",
           },
           ".cm-content": {
             fontFamily: "var(--font-geist-mono), monospace",
@@ -174,20 +269,42 @@ export const CodeEditor = ({
             </span>
           )}
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-6 px-2 text-[10px] gap-1"
-          onClick={handleFormat}
-          title="Format code (Ctrl+Shift+F)"
-        >
-          <IconWand size={12} />
-          Format
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-[10px] gap-1"
+            onClick={handleFormat}
+            title="Format code (Ctrl+Shift+F)"
+          >
+            <IconWand size={12} />
+            Format
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-[10px] gap-1"
+            onClick={() => setIsExpanded(!isExpanded)}
+            title={isExpanded ? "Collapse editor" : "Expand editor"}
+          >
+            {isExpanded ? (
+              <IconMinimize size={12} />
+            ) : (
+              <IconMaximize size={12} />
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Editor */}
-      <div ref={containerRef} className="border rounded-md overflow-hidden" />
+      <div
+        ref={containerRef}
+        className="border rounded-md overflow-hidden"
+        style={{
+          maxHeight: isExpanded ? "600px" : "250px",
+          transition: "max-height 0.3s ease",
+        }}
+      />
     </div>
   );
 };

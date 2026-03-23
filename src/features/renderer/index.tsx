@@ -32,6 +32,8 @@ import {
   IconPlus,
   IconWorld,
   IconPencil,
+  IconMaximize,
+  IconMinimize,
 } from "@tabler/icons-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -87,8 +89,36 @@ const RendererDialog = ({
   const [cdnValidationWarnings, setCdnValidationWarnings] = useState<string[]>(
     [],
   );
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const rendererRef = React.useRef<HTMLDivElement>(null);
 
   const { run } = useRunner();
+
+  // Listen for fullscreen changes
+  React.useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        // Enter fullscreen on renderer area
+        await rendererRef.current?.requestFullscreen();
+      } else {
+        // Exit fullscreen
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.error("Fullscreen error:", error);
+    }
+  };
 
   // Check all enabled packages for valid runners and typed variables
   const enabledPackages = packages.filter((p) => p.enabled !== false);
@@ -293,6 +323,24 @@ const RendererDialog = ({
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-6 text-[10px] gap-1"
+                  onClick={toggleFullscreen}
+                  title={
+                    isFullscreen
+                      ? "Exit fullscreen (Esc)"
+                      : "Enter fullscreen (F11)"
+                  }
+                >
+                  {isFullscreen ? (
+                    <IconMinimize size={12} />
+                  ) : (
+                    <IconMaximize size={12} />
+                  )}
+                  {isFullscreen ? "Exit" : "Fullscreen"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="h-6 text-[10px] gap-1 ml-auto"
                   onClick={() => setShowPrompt(true)}
                 >
@@ -318,6 +366,7 @@ const RendererDialog = ({
                 </Button>
               </div>
               <div
+                ref={rendererRef}
                 id={rendererId}
                 className="flex-1 rounded-xl border-2 border-dashed border-slate-200 bg-white overflow-auto relative"
                 style={{ minHeight: 200 }}

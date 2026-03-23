@@ -45,11 +45,13 @@ import { CodeEditor } from "@/components/code-editor";
 const CODE_TOKENS: { token: string; desc: string }[] = [
   { token: "@this", desc: "target variable's current value" },
   { token: "@t", desc: "current value (short)" },
+  { token: "@renderer", desc: "renderer element ID" },
+  { token: "@r", desc: "renderer ID (short)" },
   { token: "@space", desc: 'space character " "' },
   { token: "@s", desc: "space (short)" },
   { token: "@comma", desc: 'comma character ","' },
   { token: "@c", desc: "comma (short)" },
-  { token: "@empty", desc: 'empty string ""' },
+  { token: "@empty", desc: "empty string" },
   { token: "@e", desc: "empty (short)" },
 ];
 
@@ -115,11 +117,21 @@ const RunnerInput = (payload: {
   isDragOver: boolean;
 }) => {
   const dispatch = useAppDispatch();
-  const variables = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.variables);
-  const functions = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.functions);
+  const variables = useAppSelector(
+    (state) =>
+      state.editor.packages.find((p) => p.id === state.editor.activePackageId)!
+        .variables,
+  );
+  const functions = useAppSelector(
+    (state) =>
+      state.editor.packages.find((p) => p.id === state.editor.activePackageId)!
+        .functions,
+  );
   const [value, setValue] = useState<string>("");
   const [args, setArgs] = useState<string>("");
-  const [code, setCode] = useState<string>(payload.runner.code ?? "return @this;\n");
+  const [code, setCode] = useState<string>(
+    payload.runner.code ?? "return @this;\n",
+  );
   const [showArgSuggestions, setShowArgSuggestions] = useState(false);
   const argsInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -450,9 +462,21 @@ const RunnerInput = (payload: {
 
 const RunnerDefiner = () => {
   const dispatch = useAppDispatch();
-  const variables = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.variables);
-  const functions = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.functions);
-  const runner = useAppSelector((state) => state.editor.packages.find((p) => p.id === state.editor.activePackageId)!.runner);
+  const variables = useAppSelector(
+    (state) =>
+      state.editor.packages.find((p) => p.id === state.editor.activePackageId)!
+        .variables,
+  );
+  const functions = useAppSelector(
+    (state) =>
+      state.editor.packages.find((p) => p.id === state.editor.activePackageId)!
+        .functions,
+  );
+  const runner = useAppSelector(
+    (state) =>
+      state.editor.packages.find((p) => p.id === state.editor.activePackageId)!
+        .runner,
+  );
   const { run } = useRunner();
   const [dragState, setDragState] = React.useState<{
     dragIndex: number | null;

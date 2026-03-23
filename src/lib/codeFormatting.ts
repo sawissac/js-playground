@@ -23,6 +23,22 @@ const DEFAULT_OPTIONS: Required<FormatOptions> = {
 };
 
 /**
+ * Escape @ tokens to prevent Prettier from treating them as decorators
+ */
+function escapeTokens(code: string): string {
+  // Replace @token with __AT_TOKEN__ to avoid decorator syntax errors
+  return code.replace(/@(\w+(?:\.\w+)*)/g, "__AT_$1__");
+}
+
+/**
+ * Restore @ tokens after formatting
+ */
+function restoreTokens(code: string): string {
+  // Replace __AT_TOKEN__ back to @token
+  return code.replace(/__AT_(\w+(?:\.\w+)*)__/g, "@$1");
+}
+
+/**
  * Format JavaScript code using Prettier
  */
 export async function formatCode(
@@ -32,7 +48,10 @@ export async function formatCode(
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   try {
-    const formatted = await prettier.format(code, {
+    // Escape @ tokens before formatting to avoid decorator syntax errors
+    const escapedCode = escapeTokens(code);
+
+    const formatted = await prettier.format(escapedCode, {
       parser: "babel",
       plugins: [babelPlugin, estreePlugin],
       tabWidth: opts.indentSize,
@@ -44,7 +63,8 @@ export async function formatCode(
       arrowParens: "always",
     });
 
-    return formatted;
+    // Restore @ tokens after formatting
+    return restoreTokens(formatted);
   } catch (error) {
     // If formatting fails, return original code
     console.error("Prettier formatting error:", error);

@@ -15,6 +15,7 @@ export function uniqueIdentifier(
   mathTemp: any[],
   tempVar: any[],
   stepResults: any[] = [],
+  rendererId: string = "",
 ): any[] {
   // Define constants for common patterns to improve readability
   const PATTERNS = {
@@ -34,6 +35,8 @@ export function uniqueIdentifier(
     "@c": ",",
     "@empty": "",
     "@e": "",
+    "@renderer": rendererId,
+    "@r": rendererId,
   };
 
   // Resolves a base token (no dot) to its value
@@ -160,6 +163,7 @@ async function executeCodeAction(
   tempVar: any[],
   stepResults: any[],
   cdnModules: Record<string, any> = {},
+  rendererId: string = "",
 ): Promise<any> {
   if (!codeStr.trim()) return temp;
 
@@ -173,6 +177,8 @@ async function executeCodeAction(
     c: ",",
     empty: "",
     e: "",
+    renderer: rendererId,
+    r: rendererId,
   };
   args.forEach((a, i) => {
     tokenCtx[`arg${i + 1}`] = a;
@@ -212,6 +218,7 @@ export async function fnRunner(
   actions: FunctionActionInterface[],
   allFunctions?: { name: string; actions: FunctionActionInterface[] }[],
   cdnModules: Record<string, any> = {},
+  rendererId: string = "",
 ): Promise<any> {
   try {
     let temp: any = deepClone(payload);
@@ -240,6 +247,7 @@ export async function fnRunner(
             mathTemp,
             tempVar,
             stepResults,
+            rendererId,
           )[0];
           if (val === null || val === undefined) return "null";
           if (typeof val === "string") return JSON.stringify(val);
@@ -286,6 +294,7 @@ export async function fnRunner(
                 mathTemp,
                 tempVar,
                 stepResults,
+                rendererId,
               )[0]
             : 0;
           const endVal = params.end
@@ -296,6 +305,7 @@ export async function fnRunner(
                 mathTemp,
                 tempVar,
                 stepResults,
+                rendererId,
               )[0]
             : Array.isArray(temp)
               ? temp.length
@@ -308,6 +318,7 @@ export async function fnRunner(
                 mathTemp,
                 tempVar,
                 stepResults,
+                rendererId,
               )[0]
             : 1;
 
@@ -340,6 +351,7 @@ export async function fnRunner(
                   mathTemp,
                   tempVar,
                   subStepResults,
+                  rendererId,
                 );
                 subTemp = parsed[0];
                 subStepResults.push(subTemp);
@@ -354,6 +366,7 @@ export async function fnRunner(
                   mathTemp,
                   tempVar,
                   subStepResults,
+                  rendererId,
                 );
                 tempVar.push(parsed[0]);
                 subStepResults.push(subTemp);
@@ -368,6 +381,7 @@ export async function fnRunner(
                   mathTemp,
                   tempVar,
                   subStepResults,
+                  rendererId,
                 );
                 const mathResult = evaluate(parsed.join(" "));
                 mathTemp.push(mathResult);
@@ -388,6 +402,7 @@ export async function fnRunner(
                   tempVar,
                   subStepResults,
                   cdnModules,
+                  rendererId,
                 );
                 subStepResults.push(subTemp);
                 continue;
@@ -400,6 +415,7 @@ export async function fnRunner(
                 mathTemp,
                 tempVar,
                 subStepResults,
+                rendererId,
               );
 
               if (subAction.name === "return") {
@@ -486,6 +502,7 @@ export async function fnRunner(
             mathTemp,
             tempVar,
             stepResults,
+            rendererId,
           );
           return { earlyReturn: true, value: parsed[0] };
         }
@@ -499,6 +516,7 @@ export async function fnRunner(
             mathTemp,
             tempVar,
             stepResults,
+            rendererId,
           );
           temp = parsed[0];
           stepResults.push(temp);
@@ -514,6 +532,7 @@ export async function fnRunner(
             mathTemp,
             tempVar,
             stepResults,
+            rendererId,
           );
           mathTemp.push(evaluate(parsed.join(" ")));
           stepResults.push(temp);
@@ -529,6 +548,7 @@ export async function fnRunner(
             mathTemp,
             tempVar,
             stepResults,
+            rendererId,
           );
           tempVar.push(parsed[0]);
           stepResults.push(temp);
@@ -548,6 +568,7 @@ export async function fnRunner(
             tempVar,
             stepResults,
             cdnModules,
+            rendererId,
           );
           stepResults.push(temp);
           continue;
@@ -566,6 +587,7 @@ export async function fnRunner(
             mathTemp,
             tempVar,
             stepResults,
+            rendererId,
           );
           temp = await fnRunner(
             deepClone(temp),
@@ -573,6 +595,7 @@ export async function fnRunner(
             targetFunc.actions,
             allFunctions,
             cdnModules,
+            rendererId,
           );
           stepResults.push(temp);
           continue;
@@ -589,6 +612,7 @@ export async function fnRunner(
               mathTemp,
               tempVar,
               stepResults,
+              rendererId,
             );
             temp = unwrapPrimitive(wrapped[action.name](...parsed));
           } else {

@@ -121,7 +121,7 @@ const PromptDialog = ({
         .join(", ");
       text += `- **CDN Libraries:** ${cdnList} available as function parameters\n`;
     }
-    text += `- **Special Tokens:** \`@this\`, \`@arg1\`, \`@arg2\`, \`@space\`, \`@comma\`, \`@empty\`\n`;
+    text += `- **Special Tokens:** \`@this\`, \`@arg1\`, \`@arg2\`, \`@renderer\`, \`@space\`, \`@comma\`, \`@empty\`\n`;
     text += `- **Return Value:** Code must \`return\` a value (assigned to target variable)\n`;
 
     text += `\n## Your Task\n`;

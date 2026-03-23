@@ -289,6 +289,8 @@ const AT_TOKEN_BASE: { token: string; desc: string }[] = [
   { token: "@arg1", desc: "1st function argument" },
   { token: "@arg2", desc: "2nd function argument" },
   { token: "@arg3", desc: "3rd function argument" },
+  { token: "@renderer", desc: "renderer element ID" },
+  { token: "@r", desc: "renderer ID (short)" },
   { token: "@space", desc: 'space character " "' },
   { token: "@s", desc: "space (short)" },
   { token: "@comma", desc: 'comma character ","' },
@@ -2795,25 +2797,20 @@ const TokensReference = () => (
       </span>
       <span>
         <code className="bg-muted px-1 rounded">@this</code> /{" "}
-        <code className="bg-muted px-1 rounded">@t</code> — current value
+        <code className="bg-muted px-1 rounded">@t</code> — value
       </span>
       <span>
-        <code className="bg-muted px-1 rounded">@temp1</code> — stored temp
+        <code className="bg-muted px-1 rounded">@temp1</code>,{" "}
+        <code className="bg-muted px-1 rounded">@math1</code> — temp
       </span>
       <span>
-        <code className="bg-muted px-1 rounded">@math1</code> — math result
+        <code className="bg-muted px-1 rounded">@renderer</code> /{" "}
+        <code className="bg-muted px-1 rounded">@r</code> — DOM ID
       </span>
       <span>
-        <code className="bg-muted px-1 rounded">@pick(1)</code> — step result
-      </span>
-      <span>
-        <code className="bg-muted px-1 rounded">@space</code> — " "
-      </span>
-      <span>
-        <code className="bg-muted px-1 rounded">@comma</code> — ","
-      </span>
-      <span>
-        <code className="bg-muted px-1 rounded">@empty</code> — ""
+        <code className="bg-muted px-1 rounded">@space</code>,{" "}
+        <code className="bg-muted px-1 rounded">@comma</code>,{" "}
+        <code className="bg-muted px-1 rounded">@empty</code>
       </span>
     </div>
   </div>
@@ -2997,132 +2994,75 @@ const FunctionDefiner = () => {
                 </Button>
               </div>
 
-              <div className={cn("grid grid-cols-2 gap-1", "lg:grid-cols-5")}>
-                <Button
-                  variant="outline"
-                  onClick={() =>
+              <Select
+                onValueChange={(actionType) => {
+                  const actionMap: Record<string, { name: string }> = {
+                    add: { name: "" },
+                    if: { name: "if" },
+                    when: { name: "when" },
+                    loop: { name: "loop" },
+                    code: { name: "code" },
+                  };
+                  const action = actionMap[actionType];
+                  if (action) {
                     dispatch(
                       addFunctionAction({
                         functionId: func.id,
-                        action: { id: "", name: "", dataType: "", value: [] },
+                        action: { id: "", ...action, dataType: "", value: [] },
                       }),
-                    )
+                    );
                   }
-                  className={cn(
-                    "h-7 text-xs gap-1.5 px-2.5",
-                    "border-slate-300 bg-white text-slate-700",
-                    "hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900",
-                    "active:scale-95 transition-all duration-150",
-                  )}
-                >
+                }}
+              >
+                <SelectTrigger className="h-7 text-xs w-32 gap-1.5">
                   <IconCircleDashedPlus size={13} className="shrink-0" />
-                  <span className="font-medium">Add</span>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    dispatch(
-                      addFunctionAction({
-                        functionId: func.id,
-                        action: { id: "", name: "if", dataType: "", value: [] },
-                      }),
-                    )
-                  }
-                  className={cn(
-                    "h-7 text-xs gap-1.5 px-2.5",
-                    "border-rose-300 bg-rose-50 text-rose-700",
-                    "hover:bg-rose-100 hover:border-rose-400 hover:text-rose-800",
-                    "active:scale-95 transition-all duration-150",
-                  )}
-                >
-                  <IconCircleDashedPlus size={13} className="shrink-0" />
-                  <span className="font-medium">If</span>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    dispatch(
-                      addFunctionAction({
-                        functionId: func.id,
-                        action: {
-                          id: "",
-                          name: "when",
-                          dataType: "",
-                          value: [],
-                        },
-                      }),
-                    )
-                  }
-                  className={cn(
-                    "h-7 text-xs gap-1.5 px-2.5",
-                    "border-violet-300 bg-violet-50 text-violet-700",
-                    "hover:bg-violet-100 hover:border-violet-400 hover:text-violet-800",
-                    "active:scale-95 transition-all duration-150",
-                  )}
-                >
-                  <IconCircleDashedPlus size={13} className="shrink-0" />
-                  <span className="font-medium">When</span>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    dispatch(
-                      addFunctionAction({
-                        functionId: func.id,
-                        action: {
-                          id: "",
-                          name: "loop",
-                          dataType: "",
-                          value: [],
-                          loopParams: {
-                            start: "0",
-                            end: "@this.length",
-                            step: "1",
-                          },
-                        },
-                      }),
-                    )
-                  }
-                  className={cn(
-                    "h-7 text-xs gap-1.5 px-2.5",
-                    "border-indigo-300 bg-indigo-50 text-indigo-700",
-                    "hover:bg-indigo-100 hover:border-indigo-400 hover:text-indigo-800",
-                    "active:scale-95 transition-all duration-150",
-                  )}
-                >
-                  <IconCircleDashedPlus size={13} className="shrink-0" />
-                  <span className="font-medium">Loop</span>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    dispatch(
-                      addFunctionAction({
-                        functionId: func.id,
-                        action: {
-                          id: "",
-                          name: "code",
-                          dataType: "",
-                          value: ["return @this;\n"],
-                        },
-                      }),
-                    )
-                  }
-                  className={cn(
-                    "h-7 text-xs gap-1.5 px-2.5",
-                    "border-teal-300 bg-teal-50 text-teal-700",
-                    "hover:bg-teal-100 hover:border-teal-400 hover:text-teal-800",
-                    "active:scale-95 transition-all duration-150",
-                  )}
-                >
-                  <IconCircleDashedPlus size={13} className="shrink-0" />
-                  <span className="font-medium">Code</span>
-                </Button>
-              </div>
+                  <SelectValue placeholder="Add Action" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="add" className="text-xs">
+                    <div className="flex items-center gap-2">
+                      <IconCircleDashedPlus size={13} />
+                      Add
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="if" className="text-xs">
+                    <div className="flex items-center gap-2">
+                      <IconCircleDashedPlus
+                        size={13}
+                        className="text-rose-600"
+                      />
+                      If
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="when" className="text-xs">
+                    <div className="flex items-center gap-2">
+                      <IconCircleDashedPlus
+                        size={13}
+                        className="text-purple-600"
+                      />
+                      When
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="loop" className="text-xs">
+                    <div className="flex items-center gap-2">
+                      <IconCircleDashedPlus
+                        size={13}
+                        className="text-blue-600"
+                      />
+                      Loop
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="code" className="text-xs">
+                    <div className="flex items-center gap-2">
+                      <IconCircleDashedPlus
+                        size={13}
+                        className="text-teal-600"
+                      />
+                      Code
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className={isShown(func.id) ? "block" : "hidden"}>

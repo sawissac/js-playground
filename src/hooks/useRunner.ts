@@ -25,9 +25,12 @@ const sanitizeCdnName = (name: string): string => {
 
 export const useRunner = () => {
   const packages = useAppSelector((state) => state.editor.packages);
+  const projectId = useAppSelector((state) => state.editor.projectId);
   const dispatch = useAppDispatch();
 
   const run = async () => {
+    const rendererId = `renderer-${projectId}`;
+
     // Check rate limit before execution
     const rateLimitCheck = canExecuteCode();
     if (!rateLimitCheck.allowed) {
@@ -270,6 +273,8 @@ export const useRunner = () => {
               c: ",",
               empty: "",
               e: "",
+              renderer: rendererId,
+              r: rendererId,
             };
 
             // Validate code length
@@ -437,6 +442,7 @@ export const useRunner = () => {
               func.actions,
               functions,
               cdnModules,
+              rendererId,
             );
 
             const resultVarIndex = updatedVariables.findIndex(

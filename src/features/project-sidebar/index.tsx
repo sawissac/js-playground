@@ -18,15 +18,18 @@ import {
   IconFolder,
   IconPackage,
   IconPlus,
-  IconTrash,
-  IconEdit,
+  IconFileImport,
   IconDownload,
+  IconSettings,
+  IconChevronDown,
+  IconChevronUp,
+  IconTrash,
+  IconX,
+  IconEdit,
   IconUpload,
   IconCheck,
-  IconX,
   IconDeviceFloppy,
   IconRefresh,
-  IconSearch,
 } from "@tabler/icons-react";
 import { addLog } from "@/state/slices/logSlice";
 import { Package } from "@/state/types";
@@ -41,11 +44,9 @@ import { useDialog } from "@/hooks/useDialog";
 
 const LOCAL_STORAGE_KEY = "js_playground_project_save";
 
-interface ProjectSidebarProps {
-  onSearchClick?: () => void;
-}
+interface ProjectSidebarProps {}
 
-const ProjectSidebar = ({ onSearchClick }: ProjectSidebarProps = {}) => {
+const ProjectSidebar = ({}: ProjectSidebarProps = {}) => {
   const dispatch = useAppDispatch();
   const editorState = useAppSelector((state) => state.editor);
   const dialog = useDialog();
@@ -475,27 +476,6 @@ const ProjectSidebar = ({ onSearchClick }: ProjectSidebarProps = {}) => {
             Workspace
           </Badge>
           <div className="flex gap-1 ml-4 md:flex items-center">
-            {onSearchClick && (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2 text-xs gap-1.5 hover:bg-blue-50 hover:border-blue-300 transition-all"
-                  onClick={onSearchClick}
-                >
-                  <IconSearch size={14} />
-                  <span className="hidden sm:inline">Search</span>
-                  <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono bg-slate-100 border border-slate-300 rounded">
-                    {typeof navigator !== "undefined" &&
-                    navigator.platform?.includes("Mac")
-                      ? "⌘"
-                      : "Ctrl"}
-                    K
-                  </kbd>
-                </Button>
-                <div className="w-px h-4 bg-slate-200 mx-1" />
-              </>
-            )}
             <Button
               size="icon"
               variant="ghost"

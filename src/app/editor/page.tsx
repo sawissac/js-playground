@@ -37,9 +37,14 @@ import { useAppDispatch, useAppSelector } from "@/state/hooks";
 import { addPackage, addVariable } from "@/state/slices/editorSlice";
 import {
   IconKeyboard,
+  IconSearch,
+  IconBug,
+  IconPlayerPlay,
   IconSearch as IconSearchIcon,
 } from "@tabler/icons-react";
 import { v4 as uuidv4 } from "uuid";
+import { VariableInspector } from "@/components/VariableInspector";
+import { StatusBar } from "@/components/StatusBar";
 
 const Page = () => {
   const dispatch = useAppDispatch();
@@ -53,6 +58,7 @@ const Page = () => {
   const [codeDetailCollapsed, setCodeDetailCollapsed] = React.useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const { dismissedHints, dismissHint } = useTutorialHints();
 
   useEffect(() => {
@@ -119,6 +125,12 @@ const Page = () => {
       handler: () => setShortcutsOpen(true),
     },
     {
+      key: "i",
+      ctrl: true,
+      description: "Open variable inspector",
+      handler: () => setInspectorOpen(true),
+    },
+    {
       key: "r",
       ctrl: true,
       description: "Open renderer",
@@ -140,10 +152,37 @@ const Page = () => {
 
   useKeyboardShortcuts({ shortcuts });
 
+  const statusBarShortcuts = [
+    {
+      icon: <IconSearch size={12} />,
+      label: "Search",
+      shortcut: "K",
+      onClick: () => setSearchOpen(true),
+    },
+    {
+      icon: <IconBug size={12} />,
+      label: "Inspector",
+      shortcut: "I",
+      onClick: () => setInspectorOpen(true),
+    },
+    {
+      icon: <IconKeyboard size={12} />,
+      label: "Shortcuts",
+      shortcut: "/",
+      onClick: () => setShortcutsOpen(true),
+    },
+    {
+      icon: <IconPlayerPlay size={12} />,
+      label: "Run",
+      shortcut: "R",
+      onClick: () => setRendererOpen(true),
+    },
+  ];
+
   return (
     <div className="flex flex-col w-full h-[100dvh] overflow-hidden">
       {/* Top Application Bar */}
-      <ProjectSidebar onSearchClick={() => setSearchOpen(true)} />
+      <ProjectSidebar />
 
       <div className="flex-1 w-full overflow-hidden">
         <div className="w-full h-full">
@@ -324,11 +363,38 @@ const Page = () => {
         onOpenChange={setShortcutsOpen}
         shortcuts={shortcuts}
       />
+
+      {/* Variable Inspector Dialog */}
+      {inspectorOpen && (
+        <div className="fixed inset-0 z-50 pointer-events-none">
+          <div className="fixed right-4 top-20 bottom-4 w-96 pointer-events-auto">
+            <div className="h-full bg-white rounded-lg shadow-2xl border border-slate-200 flex flex-col">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+                <h3 className="font-semibold text-sm">Variable Inspector</h3>
+                <button
+                  onClick={() => setInspectorOpen(false)}
+                  className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-700"
+                  title="Close (Ctrl/Cmd+I)"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <VariableInspector />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <TutorialHints
         hints={tutorialHints}
         onDismiss={dismissHint}
         position="bottom"
       />
+
+      {/* Status Bar */}
+      <StatusBar shortcuts={statusBarShortcuts} />
     </div>
   );
 };
