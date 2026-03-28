@@ -51,11 +51,12 @@ export interface Package {
   id: string;
   name: string;
   enabled: boolean;
+  isDemo?: boolean;
   variables: VariableInterface[];
   functions: FunctionInterface[];
   runner: Runner[];
   codeSnippets: CodeSnippetInterface[];
-  cdnPackages: CdnPackage[];
+  cdnPackages?: CdnPackage[];
 }
 
 export interface EditorState {

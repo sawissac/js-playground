@@ -104,6 +104,11 @@ export const editorSlice = createSlice({
     setProjectName: (state, action: PayloadAction<string>) => {
       state.projectName = action.payload;
     },
+    loadDemoPackage: (state, action: PayloadAction<Package>) => {
+      const demoPackage = action.payload;
+      state.packages = [demoPackage];
+      state.activePackageId = demoPackage.id;
+    },
     addPackage: (state, action: PayloadAction<{ name: string }>) => {
       const tempActionId = uuidv4();
       const useActionId = uuidv4();
@@ -818,6 +823,7 @@ export const editorSlice = createSlice({
 
 export const {
   setProjectName,
+  loadDemoPackage,
   addPackage,
   removePackage,
   renamePackage,

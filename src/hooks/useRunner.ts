@@ -47,6 +47,12 @@ export const useRunner = () => {
 
     dispatch(clearLogs());
 
+    // Clear renderer content before fresh execution
+    const rendererEl = document.getElementById(rendererId);
+    if (rendererEl) {
+      rendererEl.innerHTML = "";
+    }
+
     // Get all enabled packages in order
     const enabledPackages = packages.filter((pkg) => pkg.enabled !== false);
 

@@ -41,10 +41,12 @@ import {
   IconBug,
   IconPlayerPlay,
   IconSearch as IconSearchIcon,
+  IconSparkles,
 } from "@tabler/icons-react";
 import { v4 as uuidv4 } from "uuid";
 import { VariableInspector } from "@/components/VariableInspector";
 import { StatusBar } from "@/components/StatusBar";
+import { AskAiOverlay } from "@/components/AskAiOverlay";
 
 const Page = () => {
   const dispatch = useAppDispatch();
@@ -59,6 +61,7 @@ const Page = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [askAiOpen, setAskAiOpen] = useState(false);
   const { dismissedHints, dismissHint } = useTutorialHints();
 
   useEffect(() => {
@@ -137,6 +140,12 @@ const Page = () => {
       handler: () => setRendererOpen(true),
     },
     {
+      key: "j",
+      ctrl: true,
+      description: "Ask AI",
+      handler: () => setAskAiOpen(true),
+    },
+    {
       key: "[",
       ctrl: true,
       description: "Toggle left panel",
@@ -176,6 +185,12 @@ const Page = () => {
       label: "Run",
       shortcut: "R",
       onClick: () => setRendererOpen(true),
+    },
+    {
+      icon: <IconSparkles size={12} />,
+      label: "Ask AI",
+      shortcut: "J",
+      onClick: () => setAskAiOpen(true),
     },
   ];
 
@@ -260,6 +275,18 @@ const Page = () => {
                     >
                       <MonitorPlayIcon className="size-3" />
                       Renderer
+                    </button>
+                    <button
+                      onClick={() => setAskAiOpen(true)}
+                      className={cn(
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
+                        "bg-purple-50 text-purple-600 border border-purple-200",
+                        "hover:bg-purple-100 hover:text-purple-700 transition-colors",
+                      )}
+                      title="Ask AI (Ctrl+J)"
+                    >
+                      <IconSparkles className="size-3" />
+                      Ask AI
                     </button>
                   </div>
 
@@ -386,6 +413,8 @@ const Page = () => {
           </div>
         </div>
       )}
+
+      <AskAiOverlay open={askAiOpen} onClose={() => setAskAiOpen(false)} />
 
       <TutorialHints
         hints={tutorialHints}

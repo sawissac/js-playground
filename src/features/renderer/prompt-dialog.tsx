@@ -46,13 +46,13 @@ const PromptDialog = ({
     text += `- **Execution:** Code runs in async JavaScript via \`new AsyncFunction()\`\n`;
 
     text += `\n## Renderer Element\n`;
-    text += `- **ID:** \`${rendererId}\` (project-scoped, shared across all packages)\n`;
-    text += `- **Access:** \`document.getElementById("${rendererId}")\`\n`;
+    text += `- **ID:** Use \`@renderer\` token (resolves to \`${rendererId}\`)\n`;
+    text += `- **Access:** \`document.getElementById(@renderer)\` or \`document.getElementById(@r)\`\n`;
     if (enabledCdn.some((c) => c.name === "d3")) {
-      text += `- **With D3:** \`d3.select("#${rendererId}")\`\n`;
+      text += `- **With D3:** \`d3.select("#" + @renderer)\`\n`;
     }
-    text += `- **⚠️ CRITICAL:** Never reuse \`${rendererId}\` as an ID for any child elements\n`;
-    text += `- **⚠️ CRITICAL:** NEVER clear renderer with \`${rendererId}.innerHTML = ""\` (preserves multi-package content)\n`;
+    text += `- **⚠️ CRITICAL:** Never reuse \`@renderer\` ID for any child elements\n`;
+    text += `- **⚠️ CRITICAL:** NEVER clear renderer with \`.innerHTML = ""\` (preserves multi-package content)\n`;
     text += `- **Instead:** Use descriptive custom IDs (\`viz-container\`, \`chart-svg\`, \`my-graph\`, etc.)\n`;
     text += `- **Content Management:** Use \`getElementById("your-custom-id")\` to update/remove your specific elements\n`;
 
@@ -125,16 +125,15 @@ const PromptDialog = ({
     text += `- **Return Value:** Code must \`return\` a value (assigned to target variable)\n`;
 
     text += `\n## Your Task\n`;
-    text += `Create code for renderer \`${rendererId}\` that: **[describe your visualization here]**\n\n`;
+    text += `Create code using \`@renderer\` token that: **[describe your visualization here]**\n\n`;
 
     text += `## Requirements\n`;
     text += `✓ Create visually appealing and interactive output\n`;
     text += `✓ Use available CDN libraries when beneficial\n`;
     text += `✓ Ensure code is compatible with async function environment\n`;
-    text += `✓ Target \`${rendererId}\` for all DOM operations\n`;
+    text += `✓ Use \`@renderer\` token for all DOM operations\n`;
     text += `✓ Use unique custom IDs for any elements you create\n`;
-    text += `✓ Manage your content via custom IDs (e.g., remove old elements before adding new ones)\n`;
-    text += `✗ Never reuse \`${rendererId}\` as an element ID\n`;
+    text += `✗ Never reuse \`@renderer\` as an element ID\n`;
     text += `✗ Never manually load external scripts\n`;
     text += `✗ Never show css in the output and use inline styles instead\n`;
     text += `✗ **NEVER clear renderer with \`.innerHTML = ""\`** (shared across packages!)\n\n`;

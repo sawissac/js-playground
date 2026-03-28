@@ -214,6 +214,19 @@ export const CodeEditor = ({
           ".cm-activeLine": {
             backgroundColor: "#f8fafc",
           },
+          ".cm-cursor": {
+            borderLeftColor: "hsl(var(--primary))",
+            borderLeftWidth: "2px",
+          },
+          "&.cm-focused .cm-cursor": {
+            borderLeftColor: "hsl(var(--primary))",
+          },
+          "&.cm-focused .cm-selectionBackground, ::selection": {
+            backgroundColor: "hsl(var(--primary) / 0.2)",
+          },
+          ".cm-selectionBackground": {
+            backgroundColor: "hsl(var(--primary) / 0.15)",
+          },
         }),
       ],
     });
@@ -299,7 +312,7 @@ export const CodeEditor = ({
       {/* Editor */}
       <div
         ref={containerRef}
-        className="border rounded-md overflow-hidden"
+        className="border rounded-md overflow-auto"
         style={{
           maxHeight: isExpanded ? "600px" : "250px",
           transition: "max-height 0.3s ease",
