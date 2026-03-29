@@ -12,9 +12,13 @@
 2. [Architecture](#architecture)
 3. [State Management](#state-management)
 4. [Feature Modules](#feature-modules)
-5. [Design System](#design-system)
-6. [Components](#components)
-7. [Technical Stack](#technical-stack)
+5. [AI Integration](#ai-integration)
+6. [Additional Components](#additional-components)
+7. [Custom Hooks](#custom-hooks)
+8. [Redux Middleware](#redux-middleware)
+9. [Design System](#design-system)
+10. [Components](#components)
+11. [Technical Stack](#technical-stack)
 
 ---
 
@@ -49,46 +53,104 @@ JS Playground is a **Turing-complete visual programming environment** that enabl
 
 ```
 src/
-├── app/              # Next.js 15 App Router
-│   ├── page.tsx      # Landing page
-│   ├── editor/       # Main editor workspace
-│   ├── layout.tsx    # Root layout with Redux provider
-│   └── globals.css   # Tailwind CSS 4 theme & tokens
-├── components/       # Reusable UI components (shadcn/ui)
-│   └── ui/          # Button, Badge, Input, Dialog, etc.
-├── features/        # Feature-based modules
+├── app/                          # Next.js 15 App Router
+│   ├── page.tsx                  # Landing page (hero + feature highlights)
+│   ├── editor/                   # Main editor workspace
+│   │   └── page.tsx
+│   ├── api/
+│   │   └── chat/
+│   │       ├── route.ts          # Ollama streaming endpoint
+│   │       ├── gemini/
+│   │       │   └── route.ts      # Google Gemini streaming endpoint
+│   │       └── gemini-validate/
+│   │           └── route.ts      # Gemini API key validation endpoint
+│   ├── layout.tsx                # Root layout with Redux provider
+│   └── globals.css               # Tailwind CSS 4 theme & tokens
+├── components/                   # Reusable UI components
+│   ├── AskAiOverlay.tsx          # AI assistant panel (chat/code modes)
+│   ├── AutoSaveIndicator.tsx     # Auto-save status indicator
+│   ├── CodeLintWarnings.tsx      # Real-time code quality warnings
+│   ├── CustomAlertDialog.tsx     # Custom alert dialog wrapper
+│   ├── ErrorBoundary.tsx         # Error boundary component
+│   ├── KeyboardShortcutsDialog.tsx # Keyboard shortcuts help modal
+│   ├── SearchDialog.tsx          # Global search / command palette
+│   ├── StatusBar.tsx             # Bottom status bar
+│   ├── TutorialHints.tsx         # In-app tutorial hint system
+│   ├── VariableInspector.tsx     # Real-time variable monitoring panel
+│   ├── code-editor.tsx           # CodeMirror 6 integration wrapper
+│   └── ui/                       # shadcn/ui primitives
+│       ├── alert.tsx, badge.tsx, button.tsx, card.tsx
+│       ├── dialog.tsx, input.tsx, label.tsx, popover.tsx
+│       ├── resizable.tsx, select.tsx, separator.tsx
+│       ├── skeleton.tsx, switch.tsx, textarea.tsx, tooltip.tsx
+├── features/                     # Feature-based modules
 │   ├── variable-container/
 │   ├── functions-container/
 │   ├── function-definer/
 │   ├── runner-definer/
 │   ├── code-detail/
-│   ├── renderer/
-│   └── ...
-├── state/           # Redux Toolkit state management
+│   ├── code-sidebar/
+│   ├── data-type-container/
+│   ├── help-modal/
+│   ├── import-export/
+│   ├── log-container/
+│   ├── project-sidebar/
+│   └── renderer/
+│       ├── index.tsx             # Main renderer component
+│       └── prompt-dialog.tsx     # AI prompt dialog for rendering
+├── state/                        # Redux Toolkit state management
 │   ├── slices/
 │   │   ├── editorSlice.ts
 │   │   └── logSlice.ts
+│   ├── middleware/
+│   │   ├── persistence.ts        # LocalForage persistence middleware
+│   │   └── undoRedo.ts           # Undo/redo middleware
 │   ├── store.ts
+│   ├── provider.tsx              # Redux provider component
 │   ├── types.ts
 │   └── hooks.ts
-├── hooks/           # Custom React hooks
-│   └── useRunner.ts  # Execution engine
-├── lib/             # Utility functions
-│   ├── function-utils.ts  # Function execution engine
-│   └── utils.ts          # Class name merger (cn)
-└── constants/       # Type definitions and action templates
+├── hooks/                        # Custom React hooks
+│   ├── useRunner.ts              # Execution engine
+│   ├── useAutoSave.ts            # Debounced auto-save
+│   ├── useDebounce.ts            # Debounce utility
+│   ├── useDialog.tsx             # Dialog state management
+│   ├── useKeyboardShortcuts.ts   # Global keyboard event handling
+│   ├── useSearch.ts              # Global search functionality
+│   └── useUndoRedo.ts            # Undo/redo management
+├── lib/                          # Utility functions
+│   ├── ai-provider.ts            # AI settings & streaming (Ollama + Gemini)
+│   ├── cdnSecurity.ts            # CDN URL validation
+│   ├── codeFormatting.ts         # Code formatting utilities
+│   ├── codeLinting.ts            # Code linting and quality checks
+│   ├── demoPackages.ts           # Pre-built demo package templates
+│   ├── executionSandbox.ts       # Code execution sandboxing
+│   ├── function-utils.ts         # Function execution engine
+│   ├── keyListener-utils.ts      # Keyboard event utilities
+│   ├── ollama.ts                 # Ollama-specific settings
+│   ├── persistence.ts            # LocalForage persistence layer
+│   ├── projectValidation.ts      # Project validation & sanitization
+│   ├── prompts.ts                # AI prompt builders
+│   ├── rateLimiter.ts            # Rate limiting for API calls
+│   ├── securityAudit.ts          # Security checking utilities
+│   ├── validation.ts             # Data validation utilities
+│   └── utils.ts                  # Class name merger (cn)
+└── constants/                    # Type definitions and action templates
+    ├── array.ts, boolean.ts, dataTypes.ts
+    ├── number.ts, object.ts, string.ts
 ```
 
 ### Design Patterns
 
 1. **Feature-Based Architecture**: Each major feature is self-contained in its own folder
 2. **Redux Toolkit Slices**: Centralized state with immutable updates using Immer
-3. **Custom Hooks**: Business logic extracted into reusable hooks (`useRunner`)
+3. **Custom Hooks**: Business logic extracted into reusable hooks (`useRunner`, `useSearch`, etc.)
 4. **UUID-Based Identities**: All entities use UUIDs for uniqueness and state management
 5. **Token System**: Variable references use `@token` syntax for dynamic resolution
 6. **Deep Cloning**: Immutable state operations with structured cloning
 7. **Async Execution**: AsyncFunction constructor for dynamic code execution
 8. **CDN Injection**: Dynamic script loading with global namespace detection
+9. **Middleware Pipeline**: Persistence and undo/redo via Redux middleware
+10. **AI Provider Abstraction**: Unified streaming interface over Ollama and Gemini backends
 
 ### Data Flow
 
@@ -275,7 +337,32 @@ RootState {
 - Project name editing
 - Package switcher
 - Import/Export functionality
+- AI settings integration (provider selection, API key, model)
 - Help modal
+
+### 9. Code Sidebar
+**Location**: `src/features/code-sidebar/`
+
+- Collapsible side panel displaying the generated JavaScript code
+- Syntax-highlighted read-only view of the current package
+
+### 10. Help Modal
+**Location**: `src/features/help-modal/`
+
+- In-editor help overlay with usage guidance
+- Action type references and token syntax cheatsheet
+
+### 11. Import / Export
+**Location**: `src/features/import-export/`
+
+- JSON-based project and package import/export dialogs
+- Validates imported data before merging into state
+
+### 12. Log Container
+**Location**: `src/features/log-container/`
+
+- Displays execution logs with timestamps, severity levels, and context
+- Clear and filter controls
 
 ---
 
@@ -848,6 +935,246 @@ cn("rounded-full bg-primary", isActive && "bg-accent", className)
 
 ---
 
+## AI Integration
+
+### AI Provider System
+
+**File:** `src/lib/ai-provider.ts`
+
+Central hub for managing AI providers and streaming chat. Supports two backends transparently behind a single `streamChat` API.
+
+**Supported Providers:**
+
+| Provider | Type            | Notes                                  |
+| -------- | --------------- | -------------------------------------- |
+| `ollama` | Local inference | Connects to a self-hosted Ollama server|
+| `gemini` | Cloud (Google)  | Uses Google Generative AI SDK          |
+
+**Key Exports:**
+
+```typescript
+type AiProvider = "ollama" | "gemini"
+
+interface AiSettings {
+  provider: AiProvider
+  ollamaUrl: string
+  ollamaModel: string
+  geminiApiKey: string
+  geminiModel: string
+}
+
+// Retrieve / persist settings in localStorage
+getAiSettings(): AiSettings
+saveAiSettings(settings: AiSettings): void
+
+// Status helpers
+isAiConfigured(): boolean
+getActiveModelName(): string
+
+// Available Gemini models
+getGeminiModelList(): string[]  // ["gemini-2.5-pro", "gemini-2.5-flash", ...]
+
+// Validation / discovery
+fetchOllamaModels(url: string): Promise<string[]>
+validateGeminiApiKey(apiKey: string, model: string): Promise<boolean>
+
+// Streaming chat (routes to active provider)
+streamChat(
+  messages: { role: string; content: string }[],
+  onChunk: (text: string) => void,
+  onDone: () => void,
+  onError: (err: Error) => void,
+  systemPrompt?: string
+): Promise<void>
+```
+
+**Routing logic:** `streamChat` posts to `/api/chat` for Ollama and `/api/chat/gemini` for Gemini. The app server routes handle the provider-specific SDKs and return Server-Sent Event streams.
+
+---
+
+### Prompt Builders
+
+**File:** `src/lib/prompts.ts`
+
+Constructs structured system prompts and user messages that give the AI full context about the running project.
+
+| Function                    | Purpose                                        |
+| --------------------------- | ---------------------------------------------- |
+| `buildProjectContextBlock()` | Serialises the current editor state for the AI |
+| `buildExecutionModelBlock()` | Embeds execution-model docs (token syntax, etc.)|
+| `buildRendererPrompt()`      | System prompt for renderer / DOM generation     |
+| `buildCodePrompt()`          | System prompt for function code generation      |
+| `buildAskPrompt()`           | System prompt for general Q&A mode              |
+
+---
+
+### AI Assistant Overlay
+
+**File:** `src/components/AskAiOverlay.tsx`
+
+Full-featured chat panel that lets users ask questions about their project or request code generation.
+
+**Modes:**
+
+| Mode   | Description                                                      |
+| ------ | ---------------------------------------------------------------- |
+| `ask`  | Q&A about the project — AI receives full project context         |
+| `code` | Code generation — response can be copied or added to a function  |
+
+**Features:**
+
+- Settings panel: select provider, configure Ollama URL/model or Gemini API key/model
+- Real-time model validation and availability check
+- Streaming responses with markdown rendering (`react-markdown` + `remark-gfm`)
+- "Copy" and "Add to Code" action buttons on generated code blocks
+- Demo package quick-loader (D3 charts, Tic-Tac-Toe, Markdown renderer, etc.)
+- Dispatches Redux actions to inject generated code directly into functions
+
+---
+
+### AI API Routes
+
+| Route                       | Method | Description                              |
+| --------------------------- | ------ | ---------------------------------------- |
+| `/api/chat`                 | POST   | Ollama streaming chat (SSE)              |
+| `/api/chat/gemini`          | POST   | Gemini streaming chat via `@google/genai`|
+| `/api/chat/gemini-validate` | POST   | Validate a Gemini API key (returns 200/401 + rate-limit aware)|
+
+---
+
+### Demo Packages
+
+**File:** `src/lib/demoPackages.ts`
+
+Pre-built project templates that can be loaded via the AI Overlay or Import dialog:
+
+- D3 Bar Chart
+- D3 Pie Chart
+- D3 Line Chart
+- Markdown Renderer
+- Tic-Tac-Toe Game
+- Interactive Form
+- Data Table
+
+---
+
+## Additional Components
+
+### AskAiOverlay
+
+See [AI Integration → AI Assistant Overlay](#ai-assistant-overlay) above.
+
+---
+
+### VariableInspector
+
+**File:** `src/components/VariableInspector.tsx`
+
+Real-time monitoring panel for variables in the active package.
+
+**Features:**
+
+- Live value display refreshed on every state change
+- Search/filter by variable name
+- Type color-coded badges (matching the data-type palette)
+- Expandable rows for `array` and `object` values showing nested structure
+
+---
+
+### SearchDialog
+
+**File:** `src/components/SearchDialog.tsx`
+
+Global command palette / search overlay.
+
+**Features:**
+
+- Opens with `Cmd/Ctrl+K` (via `useKeyboardShortcuts`)
+- Searches across variables, functions, runner steps, and code snippets
+- Keyboard-navigable results list
+- Jump-to-item action on selection
+
+---
+
+### KeyboardShortcutsDialog
+
+**File:** `src/components/KeyboardShortcutsDialog.tsx`
+
+Help modal listing all registered keyboard shortcuts. Triggered from the toolbar or via `?`.
+
+---
+
+### TutorialHints
+
+**File:** `src/components/TutorialHints.tsx`
+
+Context-aware in-app tutorial hints that surface when the editor detects a user is new to a particular panel. Dismissible per-hint.
+
+---
+
+### CodeLintWarnings
+
+**File:** `src/components/CodeLintWarnings.tsx`
+
+Inline banner that surfaces code quality issues detected by `src/lib/codeLinting.ts`. Warnings update in real time as the user edits code blocks.
+
+---
+
+### AutoSaveIndicator
+
+**File:** `src/components/AutoSaveIndicator.tsx`
+
+Small status indicator (typically in the `StatusBar`) showing the current auto-save state: idle, saving, or saved. Driven by `useAutoSave`.
+
+---
+
+### StatusBar
+
+**File:** `src/components/StatusBar.tsx`
+
+Persistent bottom bar displaying contextual status information: active package name, auto-save state, and quick-action icons.
+
+---
+
+### code-editor
+
+**File:** `src/components/code-editor.tsx`
+
+Reusable CodeMirror 6 wrapper used by `function-definer` and `code-detail`.
+
+**Features:**
+
+- JavaScript syntax highlighting and autocomplete
+- Controlled value with `onChange` callback
+- Themed to match the app's dark/light design tokens
+
+---
+
+## Custom Hooks
+
+| Hook                     | File                              | Purpose                                               |
+| ------------------------ | --------------------------------- | ----------------------------------------------------- |
+| `useRunner`              | `hooks/useRunner.ts`              | Full execution engine for running package pipelines   |
+| `useAutoSave`            | `hooks/useAutoSave.ts`            | Debounced LocalForage persistence triggered by state  |
+| `useDebounce`            | `hooks/useDebounce.ts`            | Generic debounce for values or callbacks              |
+| `useDialog`              | `hooks/useDialog.tsx`             | Open/close + data state for modal dialogs             |
+| `useKeyboardShortcuts`   | `hooks/useKeyboardShortcuts.ts`   | Register global `keydown` shortcuts with cleanup      |
+| `useSearch`              | `hooks/useSearch.ts`              | Fuzzy-search over editor entities for `SearchDialog`  |
+| `useUndoRedo`            | `hooks/useUndoRedo.ts`            | Expose undo/redo actions backed by Redux middleware    |
+
+---
+
+## Redux Middleware
+
+**Location:** `src/state/middleware/`
+
+| Middleware         | File               | Purpose                                                   |
+| ------------------ | ------------------ | --------------------------------------------------------- |
+| `persistence`      | `persistence.ts`   | Serialises editor state to LocalForage after each action  |
+| `undoRedo`         | `undoRedo.ts`      | Snapshot-based undo/redo stack for editor state           |
+
+---
+
 ## Technical Stack
 
 ### Core Framework
@@ -876,11 +1203,17 @@ cn("rounded-full bg-primary", isActive && "bg-accent", className)
 ### Visualization
 - **D3.js 7.9.0**: Data-driven visualizations and flow charts
 - **react-resizable-panels 3.0.5**: Resizable panel layouts
+- **react-markdown 10.1.0**: Markdown rendering for AI chat responses
+- **remark-gfm 4.0.1**: GitHub-flavored markdown plugin
+
+### AI
+- **@google/genai 1.47.0**: Google Generative AI SDK (Gemini models)
 
 ### Utilities
 - **mathjs 14.7.0**: Mathematical expression evaluation
 - **uuid 13.0.0**: UUID v4 generation for entity identification
 - **clsx 2.1.1**: Conditional class name utility
+- **prettier 3.8.1**: Code formatting for generated code blocks
 
 ### Development Tools
 - **@tailwindcss/postcss**: Tailwind CSS 4 PostCSS plugin
