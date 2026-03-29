@@ -122,10 +122,7 @@ export function buildRendererPrompt(
 
   text += buildExecutionModelBlock(ctx.cdnPackages);
 
-  text += `\n## Your Task\n`;
-  text += `Create code using \`@renderer\` token that: **[describe your visualization here]**\n\n`;
-
-  text += `## Requirements\n`;
+  text += `\n## Requirements\n`;
   text += `✓ Create visually appealing and interactive output\n`;
   text += `✓ Use available CDN libraries when beneficial\n`;
   text += `✓ Ensure code is compatible with async function environment\n`;
