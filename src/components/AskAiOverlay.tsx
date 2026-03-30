@@ -23,6 +23,8 @@ import {
   IconCodePlus,
   IconArrowsMaximize,
   IconArrowsMinimize,
+  IconCircleCheck,
+  IconChevronDown,
 } from "@tabler/icons-react";
 import {
   getAiSettings,
@@ -45,6 +47,7 @@ import {
 } from "@/state/slices/editorSlice";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import MDEditor from "@uiw/react-md-editor";
 
 type AiMode = "ask" | "code";
 
@@ -57,18 +60,22 @@ interface AskAiOverlayProps {
 
 const CopyCodeButton = ({ code }: { code: string }) => {
   const [copied, setCopied] = useState(false);
-  const handleCopy = () => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
   return (
     <button
-      onClick={handleCopy}
-      className="p-1.5 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition-colors"
-      title="Copy code"
+      onClick={() => {
+        navigator.clipboard.writeText(code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      className={cn(
+        "p-1 rounded transition-colors",
+        copied
+          ? "text-green-500"
+          : "text-slate-400 hover:text-slate-700 hover:bg-slate-100",
+      )}
+      title={copied ? "Copied!" : "Copy code"}
     >
-      {copied ? <IconCheck size={12} /> : <IconCopy size={12} />}
+      {copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
     </button>
   );
 };
@@ -83,19 +90,83 @@ const AddToCodeButton = ({
   onAddToCode: (code: string) => void;
 }) => {
   const [added, setAdded] = useState(false);
-  const handleAdd = () => {
-    onAddToCode(code);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
-  };
   return (
     <button
-      onClick={handleAdd}
-      className="p-1.5 rounded-md bg-slate-700 hover:bg-teal-600 text-slate-300 hover:text-white transition-colors"
-      title="Add to code action"
+      onClick={() => {
+        onAddToCode(code);
+        setAdded(true);
+        setTimeout(() => setAdded(false), 2000);
+      }}
+      className={cn(
+        "p-1 rounded transition-colors",
+        added
+          ? "text-green-500"
+          : "text-teal-500 hover:text-teal-700 hover:bg-teal-50",
+      )}
+      title={added ? "Added!" : "Use in code action"}
     >
-      {added ? <IconCheck size={12} /> : <IconCodePlus size={12} />}
+      {added ? <IconCheck size={13} /> : <IconCodePlus size={13} />}
     </button>
+  );
+};
+
+// ─── Streaming code loader (stable named component — never remounts on chunk updates) ──
+
+const StreamingCodeLoader = () => (
+  <div className="flex items-center gap-2 px-2.5 py-1.5 rounded border border-slate-200 bg-slate-50 not-prose my-1">
+    <IconLoader2 size={11} className="animate-spin text-purple-500 shrink-0" />
+    <span className="text-[11px] text-slate-500">Building...</span>
+  </div>
+);
+
+// ─── Collapsible code block (white theme) ────────────────────────────────────
+
+const CodeBlock = ({
+  children,
+  codeText,
+  lang,
+  onAddToCode,
+}: {
+  children: React.ReactNode;
+  codeText: string;
+  lang: string;
+  onAddToCode?: (code: string) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded border border-slate-200 not-prose overflow-hidden my-1.5">
+      <div className="flex items-center justify-between pl-2 pr-1 py-1 bg-white">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-1 min-w-0 text-left"
+        >
+          <IconCircleCheck size={11} className="text-green-500 shrink-0" />
+          <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wide">
+            {lang || "code"}
+          </span>
+          <IconChevronDown
+            size={10}
+            className={cn(
+              "text-slate-400 shrink-0 transition-transform duration-150",
+              open && "rotate-180",
+            )}
+          />
+        </button>
+        {codeText && (
+          <div className="flex items-center gap-0.5">
+            {onAddToCode && (
+              <AddToCodeButton code={codeText} onAddToCode={onAddToCode} />
+            )}
+            <CopyCodeButton code={codeText} />
+          </div>
+        )}
+      </div>
+      {open && (
+        <pre className="bg-slate-900 text-slate-100 text-xs p-3 overflow-x-auto m-0 animate-in fade-in slide-in-from-top-1 duration-150">
+          {children}
+        </pre>
+      )}
+    </div>
   );
 };
 
@@ -104,18 +175,44 @@ const AddToCodeButton = ({
 const MarkdownWithCopy = ({
   content,
   onAddToCode,
+  isUser,
+  isStreaming,
 }: {
   content: string;
   onAddToCode?: (code: string) => void;
+  isUser?: boolean;
+  isStreaming?: boolean;
 }) => {
+  const proseClass = cn(
+    "prose prose-sm max-w-none [&_p]:m-0 [&_ul]:m-0 [&_ol]:m-0 [&_li]:m-0 [&_:not(pre)>code]:text-xs [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0.5 [&_:not(pre)>code]:rounded",
+    isUser
+      ? "prose-invert [&_:not(pre)>code]:text-purple-100 [&_:not(pre)>code]:bg-purple-400/30 [&_a]:text-purple-200 [&_strong]:text-white"
+      : "prose-slate [&_:not(pre)>code]:text-purple-600 [&_:not(pre)>code]:bg-purple-50",
+  );
+
+  // When streaming and a code fence appears, render the loader outside react-markdown
+  // so the component is never remounted on each chunk (fixes spinner glitch)
+  if (isStreaming && content.includes("```")) {
+    const fenceIndex = content.indexOf("```");
+    const textBefore = content.slice(0, fenceIndex).trim();
+    return (
+      <div className={proseClass}>
+        {textBefore && (
+          <Markdown remarkPlugins={[remarkGfm]}>{textBefore}</Markdown>
+        )}
+        <StreamingCodeLoader />
+      </div>
+    );
+  }
+
   return (
-    <div className="prose prose-sm prose-slate max-w-none [&_p]:m-0 [&_ul]:m-0 [&_ol]:m-0 [&_li]:m-0 [&_:not(pre)>code]:text-purple-600 [&_:not(pre)>code]:text-xs [&_:not(pre)>code]:bg-purple-50 [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0.5 [&_:not(pre)>code]:rounded">
+    <div className={proseClass}>
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
           pre({ children }: React.HTMLAttributes<HTMLPreElement>) {
-            // Extract raw text from the <code> child for the copy button
             let codeText = "";
+            let lang = "";
             const codeChild = React.Children.toArray(children).find(
               (child): child is React.ReactElement =>
                 React.isValidElement(child) && child.type === "code",
@@ -123,28 +220,25 @@ const MarkdownWithCopy = ({
             if (codeChild) {
               const codeProps = codeChild.props as {
                 children?: React.ReactNode;
+                className?: string;
               };
               if (codeProps.children) {
                 codeText = String(codeProps.children).replace(/\n$/, "");
               }
+              if (codeProps.className) {
+                const match = codeProps.className.match(/language-(\w+)/);
+                if (match) lang = match[1];
+              }
             }
+
             return (
-              <div className="relative group">
-                <pre className="bg-slate-800 text-slate-100 rounded-lg text-xs p-3 overflow-x-auto">
-                  {children}
-                </pre>
-                {codeText && (
-                  <div className="absolute top-2 right-2 flex items-center gap-1">
-                    {onAddToCode && (
-                      <AddToCodeButton
-                        code={codeText}
-                        onAddToCode={onAddToCode}
-                      />
-                    )}
-                    <CopyCodeButton code={codeText} />
-                  </div>
-                )}
-              </div>
+              <CodeBlock
+                codeText={codeText}
+                lang={lang}
+                onAddToCode={onAddToCode}
+              >
+                {children}
+              </CodeBlock>
             );
           },
         }}
@@ -395,17 +489,18 @@ const SettingsPanel = ({
             <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
               Model
             </label>
-            <select
+            <input
+              list="gemini-model-list"
               value={geminiModel}
               onChange={(e) => setGeminiModel(e.target.value)}
+              placeholder="e.g. gemini-2.0-flash"
               className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-300"
-            >
+            />
+            <datalist id="gemini-model-list">
               {getGeminiModelList().map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
+                <option key={m} value={m} />
               ))}
-            </select>
+            </datalist>
           </div>
 
           <button
@@ -453,7 +548,7 @@ export const AskAiOverlay = ({ open, onClose }: AskAiOverlayProps) => {
   const animationRef = useRef<number>(0);
   const [message, setMessage] = useState("");
   const [visible, setVisible] = useState(false);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Staged animation
@@ -666,12 +761,16 @@ export const AskAiOverlay = ({ open, onClose }: AskAiOverlayProps) => {
     );
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+  const handleEditorKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [message, streaming, chatMessages],
+  );
 
   const handleConfigured = () => {
     const s = getAiSettings();
@@ -862,7 +961,7 @@ export const AskAiOverlay = ({ open, onClose }: AskAiOverlayProps) => {
                   onScroll={handleChatScroll}
                   className={cn(
                     "overflow-y-auto p-3 space-y-3 transition-all duration-300",
-                    expanded ? "max-h-[70vh]" : "max-h-64",
+                    expanded ? "h-[70vh]" : "max-h-64",
                   )}
                 >
                   {chatMessages.map((msg, i) => (
@@ -875,10 +974,10 @@ export const AskAiOverlay = ({ open, onClose }: AskAiOverlayProps) => {
                     >
                       <div
                         className={cn(
-                          "max-w-[80%] rounded-xl px-3 py-2 text-sm",
+                          "text-sm",
                           msg.role === "user"
-                            ? "bg-purple-500 text-white"
-                            : "bg-slate-100 text-slate-800",
+                            ? "max-w-[80%] rounded-xl px-3 py-2 bg-purple-500 text-white"
+                            : "w-full text-slate-800",
                         )}
                       >
                         {msg.role === "assistant" ? (
@@ -888,6 +987,9 @@ export const AskAiOverlay = ({ open, onClose }: AskAiOverlayProps) => {
                               onAddToCode={
                                 mode === "code" ? handleAddToCode : undefined
                               }
+                              isStreaming={
+                                streaming && i === chatMessages.length - 1
+                              }
                             />
                           ) : (
                             <IconLoader2
@@ -896,7 +998,10 @@ export const AskAiOverlay = ({ open, onClose }: AskAiOverlayProps) => {
                             />
                           )
                         ) : (
-                          msg.content
+                          <MarkdownWithCopy
+                            content={msg.content.replace(/\n/g, "  \n")}
+                            isUser
+                          />
                         )}
                       </div>
                     </div>
@@ -922,25 +1027,31 @@ export const AskAiOverlay = ({ open, onClose }: AskAiOverlayProps) => {
                   size={18}
                   className="text-purple-500 shrink-0 mt-1.5"
                 />
-                <textarea
+                <div
                   ref={inputRef}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={
-                    mode === "ask"
-                      ? "Ask about the playground system..."
-                      : "Describe the code you want to generate..."
-                  }
-                  rows={1}
-                  className="flex-1 bg-transparent text-slate-800 placeholder:text-slate-400 text-sm outline-none resize-none max-h-32 overflow-y-auto"
-                  disabled={streaming}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = "auto";
-                    target.style.height = target.scrollHeight + "px";
-                  }}
-                />
+                  className="flex-1 min-w-0"
+                  data-color-mode="light"
+                  onKeyDown={handleEditorKeyDown}
+                >
+                  <MDEditor
+                    value={message}
+                    onChange={(val) => setMessage(val || "")}
+                    preview="edit"
+                    hideToolbar
+                    height={Math.max(
+                      60,
+                      Math.min(100, message.split("\n").length * 24 + 36),
+                    )}
+                    textareaProps={{
+                      placeholder:
+                        mode === "ask"
+                          ? "Ask about the playground system..."
+                          : "Describe the code you want to generate...",
+                      disabled: streaming,
+                    }}
+                    className="!border-none !shadow-none [&_.w-md-editor-text-pre>code]:!text-sm [&_.w-md-editor-text-input]:!text-sm [&_.w-md-editor-text]:!min-h-[40px] transform -translate-y-[5px]"
+                  />
+                </div>
                 {chatMessages.length > 0 && (
                   <button
                     onClick={() => {

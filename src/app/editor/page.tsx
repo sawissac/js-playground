@@ -67,6 +67,8 @@ const Page = () => {
   useEffect(() => {
     // Auto-collapse panels on mount
     setTimeout(() => {
+      leftPanelRef.current?.collapse();
+      rightPanelRef.current?.collapse();
       codeDetailPanelRef.current?.collapse();
     }, 100);
   }, []);
@@ -312,13 +314,15 @@ const Page = () => {
                 {/* Function Actions content */}
                 <div
                   className={cn(
-                    "flex-1 flex flex-col gap-2 p-2 overflow-y-auto",
+                    "flex-1 flex flex-col overflow-y-auto",
                     "animate-in fade-in duration-300 delay-100",
                   )}
                 >
-                  <FeatureErrorBoundary featureName="Function Definer">
-                    <FunctionDefiner />
-                  </FeatureErrorBoundary>
+                  <div className="w-full max-w-[700px] mx-auto p-2">
+                    <FeatureErrorBoundary featureName="Function Definer">
+                      <FunctionDefiner />
+                    </FeatureErrorBoundary>
+                  </div>
                 </div>
               </div>
             </ResizablePanel>

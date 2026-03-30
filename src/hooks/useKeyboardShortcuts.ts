@@ -31,13 +31,19 @@ export function useKeyboardShortcuts({
       const matchedShortcut = shortcuts.find((shortcut) => {
         if (shortcut.enabled === false) return false;
 
-        const keyMatches = event.key.toLowerCase() === shortcut.key.toLowerCase();
-        const ctrlMatches = shortcut.ctrl ? event.ctrlKey || event.metaKey : !event.ctrlKey && !event.metaKey;
+        const keyMatches =
+          shortcut.key != null &&
+          event.key.toLowerCase() === shortcut.key.toLowerCase();
+        const ctrlMatches = shortcut.ctrl
+          ? event.ctrlKey || event.metaKey
+          : !event.ctrlKey && !event.metaKey;
         const shiftMatches = shortcut.shift ? event.shiftKey : !event.shiftKey;
         const altMatches = shortcut.alt ? event.altKey : !event.altKey;
         const metaMatches = shortcut.meta ? event.metaKey : true;
 
-        return keyMatches && ctrlMatches && shiftMatches && altMatches && metaMatches;
+        return (
+          keyMatches && ctrlMatches && shiftMatches && altMatches && metaMatches
+        );
       });
 
       if (matchedShortcut) {
@@ -48,7 +54,7 @@ export function useKeyboardShortcuts({
         matchedShortcut.handler();
       }
     },
-    [shortcuts, preventDefault]
+    [shortcuts, preventDefault],
   );
 
   useEffect(() => {
@@ -64,12 +70,21 @@ export function formatShortcut(shortcut: KeyboardShortcut): string {
   const parts: string[] = [];
 
   if (shortcut.ctrl || shortcut.meta) {
-    parts.push(typeof navigator !== "undefined" && navigator.platform.includes("Mac") ? "⌘" : "Ctrl");
+    parts.push(
+      typeof navigator !== "undefined" && navigator.platform.includes("Mac")
+        ? "⌘"
+        : "Ctrl",
+    );
   }
   if (shortcut.shift) parts.push("⇧");
-  if (shortcut.alt) parts.push(typeof navigator !== "undefined" && navigator.platform.includes("Mac") ? "⌥" : "Alt");
+  if (shortcut.alt)
+    parts.push(
+      typeof navigator !== "undefined" && navigator.platform.includes("Mac")
+        ? "⌥"
+        : "Alt",
+    );
 
-  parts.push(shortcut.key.toUpperCase());
+  parts.push(shortcut.key?.toUpperCase() ?? "");
 
   return parts.join("+");
 }
