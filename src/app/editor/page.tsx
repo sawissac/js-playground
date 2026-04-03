@@ -42,12 +42,16 @@ import {
   IconPlayerPlay,
   IconSearch as IconSearchIcon,
   IconSparkles,
+  IconVariable,
+  IconFunction,
 } from "@tabler/icons-react";
 import { v4 as uuidv4 } from "uuid";
 import { PackageInspector } from "@/components/PackageInspector";
 import { StatusBar } from "@/components/StatusBar";
 import { AskAiOverlay } from "@/components/AskAiOverlay";
 import { motion, useDragControls } from "framer-motion";
+
+type MobileTab = "definitions" | "actions" | "runner";
 
 const Page = () => {
   const dispatch = useAppDispatch();
@@ -65,6 +69,15 @@ const Page = () => {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [askAiOpen, setAskAiOpen] = useState(false);
   const { dismissedHints, dismissHint } = useTutorialHints();
+  const [mobileTab, setMobileTab] = useState<MobileTab>("actions");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     // Auto-collapse panels on mount
@@ -134,6 +147,10 @@ const Page = () => {
     const handleForceOpenTab = (e: CustomEvent<string>) => {
       const tab = e.detail;
       window.dispatchEvent(new CustomEvent("change-code-tab", { detail: tab }));
+      if (isMobile) {
+        setMobileTab("runner");
+        return;
+      }
       if (rightPanelRef.current?.isCollapsed()) {
         rightPanelRef.current.expand();
       }
@@ -146,7 +163,7 @@ const Page = () => {
 
     window.addEventListener("force-open-tab", handleForceOpenTab as EventListener);
     return () => window.removeEventListener("force-open-tab", handleForceOpenTab as EventListener);
-  }, []);
+  }, [isMobile]);
 
   const shortcuts = [
     {
@@ -259,195 +276,305 @@ const Page = () => {
     },
   ];
 
+  const mobileTabs = [
+    { id: "definitions" as MobileTab, label: "Definitions", icon: IconVariable },
+    { id: "actions" as MobileTab, label: "Actions", icon: IconFunction },
+    { id: "runner" as MobileTab, label: "Runner", icon: IconPlayerPlay },
+  ];
+
   return (
     <div className="flex flex-col w-full h-[100dvh] overflow-hidden">
       {/* Top Application Bar */}
       <ProjectSidebar />
 
       <div className="flex-1 w-full overflow-hidden">
-        <div className="w-full h-full">
-          <ResizablePanelGroup direction="horizontal" className="w-full h-full">
-            {/* Left Panel — Definitions */}
-            <ResizablePanel
-              ref={leftPanelRef}
-              defaultSize={20}
-              minSize={16}
-              maxSize={30}
-              collapsible
-              collapsedSize={0}
-              onCollapse={() => setLeftCollapsed(true)}
-              onExpand={() => setLeftCollapsed(false)}
-            >
-              <div
-                className={cn(
-                  "flex flex-col gap-2 p-2 h-full overflow-y-auto",
-                  "animate-in fade-in slide-in-from-left-4 duration-300",
-                )}
-              >
-                <Badge variant="default" className="w-fit text-[10px]">
-                  Variables
-                </Badge>
-                <FeatureErrorBoundary featureName="Variables">
-                  <VariableContainer />
-                </FeatureErrorBoundary>
-                <hr className="border-border" />
-                <FeatureErrorBoundary featureName="Data Types">
-                  <DataTypeContainer />
-                </FeatureErrorBoundary>
-                <hr className="border-border" />
-                <FeatureErrorBoundary featureName="Functions">
-                  <FunctionsContainer />
-                </FeatureErrorBoundary>
-              </div>
-            </ResizablePanel>
-            <ResizableHandle withHandle />
+        {isMobile ? (
+          /* ── Mobile Layout: single panel with bottom tab switcher ── */
+          <div className="h-full flex flex-col">
+            <div className="flex-1 overflow-hidden">
+              {mobileTab === "definitions" && (
+                <div className="flex flex-col gap-2 p-2 h-full overflow-y-auto animate-in fade-in slide-in-from-left-4 duration-300">
+                  <Badge variant="default" className="w-fit text-[10px]">
+                    Variables
+                  </Badge>
+                  <FeatureErrorBoundary featureName="Variables">
+                    <VariableContainer />
+                  </FeatureErrorBoundary>
+                  <hr className="border-border" />
+                  <FeatureErrorBoundary featureName="Data Types">
+                    <DataTypeContainer />
+                  </FeatureErrorBoundary>
+                  <hr className="border-border" />
+                  <FeatureErrorBoundary featureName="Functions">
+                    <FunctionsContainer />
+                  </FeatureErrorBoundary>
+                </div>
+              )}
 
-            {/* Center Panel — Function Actions (main editing area) */}
-            <ResizablePanel defaultSize={36} minSize={28}>
-              <div className="h-full flex flex-col">
-                {/* Panel toggle toolbar */}
-                <div className="shrink-0 flex items-center justify-between px-2 py-1 border-b border-border bg-muted/30">
-                  <button
-                    onClick={toggleLeft}
-                    className={cn(
-                      "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground",
-                      "hover:bg-accent hover:text-accent-foreground transition-colors",
-                    )}
-                    title={
-                      leftCollapsed ? "Show left panel" : "Hide left panel"
-                    }
-                  >
-                    {leftCollapsed ? (
-                      <PanelLeftOpenIcon className="size-3.5" />
-                    ) : (
-                      <PanelLeftCloseIcon className="size-3.5" />
-                    )}
-                    <span>{leftCollapsed ? "Definitions" : "Hide"}</span>
-                  </button>
-
-                  <div className="flex items-center gap-2">
+              {mobileTab === "actions" && (
+                <div className="h-full flex flex-col animate-in fade-in duration-300">
+                  <div className="shrink-0 flex items-center justify-between px-2 py-1 border-b border-border bg-muted/30">
                     <Badge variant="default" className="text-[10px]">
                       Function Actions
                     </Badge>
-                    <button
-                      onClick={() => setRendererOpen(true)}
-                      className={cn(
-                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
-                        "bg-blue-50 text-blue-600 border border-blue-200",
-                        "hover:bg-blue-100 hover:text-blue-700 transition-colors",
-                      )}
-                      title="Open Renderer"
-                    >
-                      <MonitorPlayIcon className="size-3" />
-                      Renderer
-                    </button>
-                    <button
-                      onClick={() => setAskAiOpen(true)}
-                      className={cn(
-                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
-                        "bg-purple-50 text-purple-600 border border-purple-200",
-                        "hover:bg-purple-100 hover:text-purple-700 transition-colors",
-                      )}
-                      title="Ask AI (Ctrl+J)"
-                    >
-                      <IconSparkles className="size-3" />
-                      Ask AI
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setRendererOpen(true)}
+                        className={cn(
+                          "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
+                          "bg-blue-50 text-blue-600 border border-blue-200",
+                          "hover:bg-blue-100 hover:text-blue-700 transition-colors",
+                        )}
+                        title="Open Renderer"
+                      >
+                        <MonitorPlayIcon className="size-3" />
+                        Renderer
+                      </button>
+                      <button
+                        onClick={() => setAskAiOpen(true)}
+                        className={cn(
+                          "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
+                          "bg-purple-50 text-purple-600 border border-purple-200",
+                          "hover:bg-purple-100 hover:text-purple-700 transition-colors",
+                        )}
+                        title="Ask AI"
+                      >
+                        <IconSparkles className="size-3" />
+                        Ask AI
+                      </button>
+                    </div>
                   </div>
-
-                  <button
-                    onClick={toggleRight}
-                    className={cn(
-                      "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground",
-                      "hover:bg-accent hover:text-accent-foreground transition-colors",
-                    )}
-                    title={
-                      rightCollapsed ? "Show right panel" : "Hide right panel"
-                    }
-                  >
-                    <span>{rightCollapsed ? "Runner" : "Hide"}</span>
-                    {rightCollapsed ? (
-                      <PanelRightOpenIcon className="size-3.5" />
-                    ) : (
-                      <PanelRightCloseIcon className="size-3.5" />
-                    )}
-                  </button>
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="w-full p-2">
+                      <FeatureErrorBoundary featureName="Function Definer">
+                        <FunctionDefiner />
+                      </FeatureErrorBoundary>
+                    </div>
+                  </div>
                 </div>
+              )}
 
-                {/* Function Actions content */}
-                <div
+              {mobileTab === "runner" && (
+                <div className="h-full flex flex-col gap-2 p-2 overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-300">
+                  <Badge variant="default" className="w-fit text-[10px]">
+                    Runner Flow
+                  </Badge>
+                  <FeatureErrorBoundary featureName="Runner">
+                    <RunnerDefiner />
+                  </FeatureErrorBoundary>
+                  <hr className="border-border" />
+                  <FeatureErrorBoundary featureName="Code Detail">
+                    <CodeDetail onToggle={() => {}} isCollapsed={false} />
+                  </FeatureErrorBoundary>
+                </div>
+              )}
+            </div>
+
+            {/* Mobile bottom tab bar */}
+            <div className="shrink-0 flex items-stretch border-t border-border bg-background">
+              {mobileTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setMobileTab(tab.id)}
                   className={cn(
-                    "flex-1 flex flex-col overflow-y-auto",
-                    "animate-in fade-in duration-300 delay-100",
+                    "flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
+                    mobileTab === tab.id
+                      ? "text-primary border-t-2 border-primary -mt-px"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  <div className="w-full max-w-[700px] mx-auto p-2">
-                    <FeatureErrorBoundary featureName="Function Definer">
-                      <FunctionDefiner />
-                    </FeatureErrorBoundary>
+                  <tab.icon size={18} />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* ── Desktop Layout: 3-panel resizable ── */
+          <div className="w-full h-full">
+            <ResizablePanelGroup direction="horizontal" className="w-full h-full">
+              {/* Left Panel — Definitions */}
+              <ResizablePanel
+                ref={leftPanelRef}
+                defaultSize={20}
+                minSize={16}
+                maxSize={30}
+                collapsible
+                collapsedSize={0}
+                onCollapse={() => setLeftCollapsed(true)}
+                onExpand={() => setLeftCollapsed(false)}
+              >
+                <div
+                  className={cn(
+                    "flex flex-col gap-2 p-2 h-full overflow-y-auto",
+                    "animate-in fade-in slide-in-from-left-4 duration-300",
+                  )}
+                >
+                  <Badge variant="default" className="w-fit text-[10px]">
+                    Variables
+                  </Badge>
+                  <FeatureErrorBoundary featureName="Variables">
+                    <VariableContainer />
+                  </FeatureErrorBoundary>
+                  <hr className="border-border" />
+                  <FeatureErrorBoundary featureName="Data Types">
+                    <DataTypeContainer />
+                  </FeatureErrorBoundary>
+                  <hr className="border-border" />
+                  <FeatureErrorBoundary featureName="Functions">
+                    <FunctionsContainer />
+                  </FeatureErrorBoundary>
+                </div>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+
+              {/* Center Panel — Function Actions (main editing area) */}
+              <ResizablePanel defaultSize={36} minSize={28}>
+                <div className="h-full flex flex-col">
+                  {/* Panel toggle toolbar */}
+                  <div className="shrink-0 flex items-center justify-between px-2 py-1 border-b border-border bg-muted/30">
+                    <button
+                      onClick={toggleLeft}
+                      className={cn(
+                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground",
+                        "hover:bg-accent hover:text-accent-foreground transition-colors",
+                      )}
+                      title={
+                        leftCollapsed ? "Show left panel" : "Hide left panel"
+                      }
+                    >
+                      {leftCollapsed ? (
+                        <PanelLeftOpenIcon className="size-3.5" />
+                      ) : (
+                        <PanelLeftCloseIcon className="size-3.5" />
+                      )}
+                      <span>{leftCollapsed ? "Definitions" : "Hide"}</span>
+                    </button>
+
+                    <div className="flex items-center gap-2">
+                      <Badge variant="default" className="text-[10px]">
+                        Function Actions
+                      </Badge>
+                      <button
+                        onClick={() => setRendererOpen(true)}
+                        className={cn(
+                          "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
+                          "bg-blue-50 text-blue-600 border border-blue-200",
+                          "hover:bg-blue-100 hover:text-blue-700 transition-colors",
+                        )}
+                        title="Open Renderer"
+                      >
+                        <MonitorPlayIcon className="size-3" />
+                        Renderer
+                      </button>
+                      <button
+                        onClick={() => setAskAiOpen(true)}
+                        className={cn(
+                          "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
+                          "bg-purple-50 text-purple-600 border border-purple-200",
+                          "hover:bg-purple-100 hover:text-purple-700 transition-colors",
+                        )}
+                        title="Ask AI (Ctrl+J)"
+                      >
+                        <IconSparkles className="size-3" />
+                        Ask AI
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={toggleRight}
+                      className={cn(
+                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground",
+                        "hover:bg-accent hover:text-accent-foreground transition-colors",
+                      )}
+                      title={
+                        rightCollapsed ? "Show right panel" : "Hide right panel"
+                      }
+                    >
+                      <span>{rightCollapsed ? "Runner" : "Hide"}</span>
+                      {rightCollapsed ? (
+                        <PanelRightOpenIcon className="size-3.5" />
+                      ) : (
+                        <PanelRightCloseIcon className="size-3.5" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Function Actions content */}
+                  <div
+                    className={cn(
+                      "flex-1 flex flex-col overflow-y-auto",
+                      "animate-in fade-in duration-300 delay-100",
+                    )}
+                  >
+                    <div className="w-full max-w-[700px] mx-auto p-2">
+                      <FeatureErrorBoundary featureName="Function Definer">
+                        <FunctionDefiner />
+                      </FeatureErrorBoundary>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </ResizablePanel>
-            <ResizableHandle withHandle />
+              </ResizablePanel>
+              <ResizableHandle withHandle />
 
-            {/* Right Panel — Runner + Code Detail + Log */}
-            <ResizablePanel
-              ref={rightPanelRef}
-              defaultSize={30}
-              minSize={24}
-              collapsible
-              collapsedSize={0}
-              onCollapse={() => setRightCollapsed(true)}
-              onExpand={() => setRightCollapsed(false)}
-            >
-              <ResizablePanelGroup direction="vertical" className="h-full">
-                {/* Runner Flow */}
-                <ResizablePanel defaultSize={40} minSize={20}>
-                  <div
-                    className={cn(
-                      "flex flex-col gap-2 p-2 h-full overflow-y-auto",
-                      "animate-in fade-in slide-in-from-right-4 duration-300 delay-150",
-                    )}
-                  >
-                    <Badge variant="default" className="w-fit text-[10px]">
-                      Runner Flow
-                    </Badge>
-                    <FeatureErrorBoundary featureName="Runner">
-                      <RunnerDefiner />
-                    </FeatureErrorBoundary>
-                  </div>
-                </ResizablePanel>
-                <ResizableHandle withHandle />
+              {/* Right Panel — Runner + Code Detail + Log */}
+              <ResizablePanel
+                ref={rightPanelRef}
+                defaultSize={30}
+                minSize={24}
+                collapsible
+                collapsedSize={0}
+                onCollapse={() => setRightCollapsed(true)}
+                onExpand={() => setRightCollapsed(false)}
+              >
+                <ResizablePanelGroup direction="vertical" className="h-full">
+                  {/* Runner Flow */}
+                  <ResizablePanel defaultSize={40} minSize={20}>
+                    <div
+                      className={cn(
+                        "flex flex-col gap-2 p-2 h-full overflow-y-auto",
+                        "animate-in fade-in slide-in-from-right-4 duration-300 delay-150",
+                      )}
+                    >
+                      <Badge variant="default" className="w-fit text-[10px]">
+                        Runner Flow
+                      </Badge>
+                      <FeatureErrorBoundary featureName="Runner">
+                        <RunnerDefiner />
+                      </FeatureErrorBoundary>
+                    </div>
+                  </ResizablePanel>
+                  <ResizableHandle withHandle />
 
-                {/* Code Detail — Objects + FlowChart tabs */}
-                <ResizablePanel
-                  ref={codeDetailPanelRef}
-                  defaultSize={32}
-                  minSize={18}
-                  collapsible
-                  collapsedSize={5}
-                  onCollapse={() => setCodeDetailCollapsed(true)}
-                  onExpand={() => setCodeDetailCollapsed(false)}
-                >
-                  <div
-                    className={cn(
-                      "h-full overflow-hidden",
-                      "animate-in fade-in slide-in-from-right-4 duration-300 delay-200",
-                    )}
+                  {/* Code Detail — Objects + FlowChart tabs */}
+                  <ResizablePanel
+                    ref={codeDetailPanelRef}
+                    defaultSize={32}
+                    minSize={18}
+                    collapsible
+                    collapsedSize={5}
+                    onCollapse={() => setCodeDetailCollapsed(true)}
+                    onExpand={() => setCodeDetailCollapsed(false)}
                   >
-                    <FeatureErrorBoundary featureName="Code Detail">
-                      <CodeDetail
-                        onToggle={toggleCodeDetail}
-                        isCollapsed={codeDetailCollapsed}
-                      />
-                    </FeatureErrorBoundary>
-                  </div>
-                </ResizablePanel>
-              </ResizablePanelGroup>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </div>
+                    <div
+                      className={cn(
+                        "h-full overflow-hidden",
+                        "animate-in fade-in slide-in-from-right-4 duration-300 delay-200",
+                      )}
+                    >
+                      <FeatureErrorBoundary featureName="Code Detail">
+                        <CodeDetail
+                          onToggle={toggleCodeDetail}
+                          isCollapsed={codeDetailCollapsed}
+                        />
+                      </FeatureErrorBoundary>
+                    </div>
+                  </ResizablePanel>
+                </ResizablePanelGroup>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </div>
+        )}
       </div>
 
       <RendererDialog open={rendererOpen} onOpenChange={setRendererOpen} />
@@ -461,15 +588,15 @@ const Page = () => {
       {/* Package Inspector Dialog */}
       {inspectorOpen && (
         <div className="fixed inset-0 z-50 pointer-events-none">
-          <motion.div 
+          <motion.div
             drag
             dragControls={dragControls}
             dragListener={false}
             dragMomentum={false}
-            className="fixed inset-0 m-auto w-80 lg:w-96 pointer-events-auto h-[min(calc(100vh-6rem),800px)] flex flex-col"
+            className="fixed inset-0 m-auto w-[calc(100vw-2rem)] sm:w-80 lg:w-96 pointer-events-auto h-[min(calc(100vh-6rem),800px)] flex flex-col"
           >
             <div className="h-full bg-white/95 backdrop-blur-sm rounded-lg shadow-2xl border border-slate-200 flex flex-col pointer-events-auto">
-              <div 
+              <div
                 className="flex items-center justify-between px-4 py-3 border-b border-slate-200 cursor-move bg-slate-50/80 rounded-t-lg"
                 onPointerDown={(e) => dragControls.start(e)}
               >

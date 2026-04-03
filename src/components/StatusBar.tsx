@@ -33,7 +33,7 @@ export const StatusBar = ({ shortcuts, className }: StatusBarProps) => {
   return (
     <div
       className={cn(
-        "flex items-center justify-between px-4 py-1.5 bg-slate-800 text-slate-200 text-xs border-t border-slate-700 shrink-0",
+        "flex items-center justify-between px-2 sm:px-4 py-1.5 bg-slate-800 text-slate-200 text-xs border-t border-slate-700 shrink-0",
         className
       )}
     >
@@ -57,7 +57,7 @@ export const StatusBar = ({ shortcuts, className }: StatusBarProps) => {
       </div>
 
       {/* Right side - info */}
-      <div className="flex items-center gap-4 text-slate-400">
+      <div className="hidden sm:flex items-center gap-4 text-slate-400">
         <span className="text-[10px] font-mono">JS Playground</span>
       </div>
     </div>

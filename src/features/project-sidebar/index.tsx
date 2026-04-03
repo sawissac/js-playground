@@ -465,9 +465,9 @@ const ProjectSidebar = ({}: ProjectSidebarProps = {}) => {
   };
 
   return (
-    <div className="flex flex-row items-center w-full bg-white/70 backdrop-blur-xl border-b border-slate-200/60 px-2 gap-2 h-11 shrink-0 z-40 overflow-x-auto shadow-sm transition-all duration-300">
+    <div className="flex flex-row items-center w-full bg-white/70 backdrop-blur-xl border-b border-slate-200/60 px-2 gap-1 sm:gap-2 h-11 shrink-0 z-40 overflow-x-hidden shadow-sm transition-all duration-300">
       {/* Project Header Area */}
-      <div className="flex items-center gap-1.5 shrink-0 pr-2 border-r border-slate-200/50">
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 pr-1.5 sm:pr-2 border-r border-slate-200/50">
         {isEditingProject ? (
           <input
             className="w-32 text-xs font-medium border border-blue-400 bg-blue-50/50 focus:outline-none rounded px-1.5 py-0.5 transition-all"
@@ -487,7 +487,7 @@ const ProjectSidebar = ({}: ProjectSidebarProps = {}) => {
           >
             <IconFolder size={14} className="text-blue-600 shrink-0" />
             <span
-              className="text-xs font-semibold text-slate-800 truncate max-w-[120px] group-hover:text-blue-600 transition-colors"
+              className="text-xs font-semibold text-slate-800 truncate max-w-[72px] sm:max-w-[120px] group-hover:text-blue-600 transition-colors"
               title={editorState.projectName}
             >
               {editorState.projectName}
@@ -542,7 +542,7 @@ const ProjectSidebar = ({}: ProjectSidebarProps = {}) => {
       </div>
 
       {/* Packages List */}
-      <div className="flex-1 flex items-center gap-1.5 overflow-hidden h-full">
+      <div className="flex-1 flex items-center gap-1 sm:gap-1.5 overflow-hidden h-full min-w-0">
         <Button
           size="icon"
           variant="outline"
@@ -553,7 +553,7 @@ const ProjectSidebar = ({}: ProjectSidebarProps = {}) => {
           <IconPlus size={12} />
         </Button>
 
-        <div className="flex flex-row items-center gap-1.5 overflow-x-auto h-full px-1 scrollbar-hide flex-1">
+        <div className="flex flex-row items-center gap-1 sm:gap-1.5 overflow-x-auto h-full px-1 scrollbar-hide flex-1 min-w-0">
           {editorState.packages.map((pkg) => {
             const isActive = pkg.id === editorState.activePackageId;
             return (

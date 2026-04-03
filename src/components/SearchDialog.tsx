@@ -86,9 +86,9 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
           />
 
           {/* Filters */}
-          <div className="flex items-center gap-2">
-            <IconFilter size={14} className="text-slate-400" />
-            <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <IconFilter size={14} className="text-slate-400 shrink-0" />
+            <div className="flex flex-wrap gap-1.5">
               <Badge
                 variant={filterType === "all" ? "default" : "outline"}
                 className="cursor-pointer text-xs"
@@ -118,20 +118,20 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
                 Runners
               </Badge>
             </div>
-            <div className="ml-auto flex gap-2">
+            <div className="flex flex-wrap gap-1.5">
               <Badge
                 variant={scope === "all" ? "default" : "outline"}
                 className="cursor-pointer text-xs"
                 onClick={() => setScope("all")}
               >
-                All Packages
+                All Pkgs
               </Badge>
               <Badge
                 variant={scope === "current" ? "default" : "outline"}
                 className="cursor-pointer text-xs"
                 onClick={() => setScope("current")}
               >
-                Current Package
+                Current Pkg
               </Badge>
             </div>
           </div>

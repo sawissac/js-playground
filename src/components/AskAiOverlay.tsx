@@ -859,7 +859,7 @@ export const AskAiOverlay = ({ open, onClose }: AskAiOverlayProps) => {
       {/* Chat box */}
       <div
         className={cn(
-          "relative z-10 w-full max-w-2xl mx-auto mb-12 px-4",
+          "relative z-10 w-full max-w-2xl mx-auto mb-4 sm:mb-12 px-3 sm:px-4",
           "transition-all duration-500 ease-out",
           showContent ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
         )}

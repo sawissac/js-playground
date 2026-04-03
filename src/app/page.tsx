@@ -42,7 +42,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground overflow-hidden selection:bg-primary/20">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden selection:bg-primary/20">
       {/* Dynamic Background Effects */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
@@ -52,7 +52,7 @@ export default function Home() {
 
       {/* Navigation Bar */}
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="container mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shadow-md">
               <IconCodeDots size={20} className="text-primary-foreground" />
@@ -74,19 +74,19 @@ export default function Home() {
         </div>
       </nav>
 
-      <main className="container mx-auto px-6 pt-32 pb-24 relative z-10">
+      <main className="container mx-auto px-4 sm:px-6 pt-24 sm:pt-32 pb-16 sm:pb-24 relative z-10">
         {/* Hero Section */}
-        <div className="max-w-4xl mx-auto text-center space-y-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <span className="relative flex h-2 w-2">
+        <div className="max-w-4xl mx-auto text-center space-y-6 sm:space-y-8">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-medium text-primary mb-4 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-full">
+            <span className="relative flex h-2 w-2 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
             </span>
-            <IconBolt size={14} />
-            js-playground v0.1.0 — Open Source Visual Logic Editor
+            <IconBolt size={14} className="shrink-0" />
+            <span className="truncate">js-playground v0.1.0 — Open Source Visual Logic Editor</span>
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight animate-in fade-in slide-in-from-bottom-6 duration-700 delay-150 [text-wrap:balance]">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight animate-in fade-in slide-in-from-bottom-6 duration-700 delay-150 [text-wrap:balance]">
             Visual Logic Editor for the{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-accent to-primary">
               Modern Web
@@ -100,7 +100,7 @@ export default function Home() {
             built on React and Redux.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4 animate-in fade-in slide-in-from-bottom-10 duration-700 delay-500">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-4 pt-4 animate-in fade-in slide-in-from-bottom-10 duration-700 delay-500">
             <Link
               href="/editor"
               className="group h-12 px-8 inline-flex items-center justify-center rounded-full text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
@@ -125,7 +125,7 @@ export default function Home() {
         </div>
 
         {/* Feature Highlights */}
-        <div className="mt-32">
+        <div className="mt-20 sm:mt-32">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Powerful Features
@@ -207,7 +207,7 @@ export default function Home() {
         </div>
 
         {/* Featured Packages */}
-        <div className="mt-32">
+        <div className="mt-20 sm:mt-32">
           <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-xs font-medium text-accent-foreground mb-4">
               <IconSparkles size={14} />
@@ -287,8 +287,8 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-muted mt-20">
-        <div className="container mx-auto px-6 py-12">
+      <footer className="border-t border-border bg-muted mt-12 sm:mt-20">
+        <div className="container mx-auto px-4 sm:px-6 py-10 sm:py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div className="md:col-span-2">
               <div className="flex items-center gap-2 mb-4">
