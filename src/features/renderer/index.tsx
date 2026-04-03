@@ -34,6 +34,7 @@ import {
   IconPencil,
   IconMaximize,
   IconMinimize,
+  IconTerminal2,
 } from "@tabler/icons-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,10 @@ const RendererDialog = ({
   const runner = activePackage.runner;
   const variables = activePackage.variables;
   const cdnPackages = activePackage.cdnPackages || [];
+
+  const logs = useAppSelector((s) => s.log.logs);
+  const errorCount = logs.filter((l) => l.type === "error").length;
+  const warningCount = logs.filter((l) => l.type === "warning").length;
 
   const rendererId = `renderer-${projectId}`;
   const [copied, setCopied] = useState(false);
@@ -341,7 +346,31 @@ const RendererDialog = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-6 text-[10px] gap-1 ml-auto"
+                  className={cn(
+                    "h-6 text-[10px] gap-1 ml-auto",
+                    errorCount > 0
+                      ? "text-red-600 border-red-200 bg-red-50 hover:bg-red-100 hover:text-red-700"
+                      : warningCount > 0
+                        ? "text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:text-amber-700"
+                        : "text-slate-600"
+                  )}
+                  onClick={() => {
+                    onOpenChange(false);
+                    setTimeout(() => {
+                      window.dispatchEvent(
+                        new CustomEvent("force-open-tab", { detail: "log" })
+                      );
+                    }, 100);
+                  }}
+                  title="View Logs"
+                >
+                  <IconTerminal2 size={12} />
+                  Logs {logs.length > 0 && `(${logs.length})`}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 text-[10px] gap-1"
                   onClick={() => setShowPrompt(true)}
                 >
                   <IconSparkles size={12} />
@@ -374,15 +403,18 @@ const RendererDialog = ({
             </div>
 
             {/* Right: Package List + CDN Packages */}
-            <div className="w-72 shrink-0 flex flex-col gap-2 border-l border-slate-200 pl-4 overflow-y-auto">
-              {/* Project Packages */}
-              <Badge variant="secondary" className="text-[10px] w-fit">
-                Packages
-              </Badge>
-              <p className="text-[10px] text-muted-foreground">
-                Select active package. Drag to reorder.
-              </p>
-              <div className="space-y-1.5">
+            <div className="w-72 shrink-0 flex flex-col border-l border-slate-200 pl-4 overflow-hidden gap-4 py-2">
+              {/* Top Half: Project Packages */}
+              <div className="flex-1 min-h-0 flex flex-col">
+                <div className="shrink-0 mb-2 pr-4">
+                  <Badge variant="secondary" className="text-[10px] w-fit mb-1">
+                    Packages
+                  </Badge>
+                  <p className="text-[10px] text-muted-foreground">
+                    Select active package. Drag to reorder.
+                  </p>
+                </div>
+                <div className="flex-1 overflow-y-auto space-y-1.5 pr-2 min-h-0 pb-2">
                 {packages.map((pkg, index) => {
                   const isActive = pkg.id === activePackageId;
                   const isEnabled = pkg.enabled !== false;
@@ -447,46 +479,52 @@ const RendererDialog = ({
                     </div>
                   );
                 })}
+                </div>
               </div>
 
-              {/* CDN Packages */}
-              <hr className="border-slate-200" />
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-[10px] w-fit">
-                  CDN Packages
-                </Badge>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-5 text-[10px] gap-0.5 ml-auto px-1.5"
-                  onClick={() => {
-                    setShowPredefinedCdn(!showPredefinedCdn);
-                    setShowAddCdn(false);
-                  }}
-                >
-                  <IconSparkles size={10} />
-                  Quick
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-5 text-[10px] gap-0.5 px-1.5"
-                  onClick={() => {
-                    setShowAddCdn(!showAddCdn);
-                    setShowPredefinedCdn(false);
-                  }}
-                >
-                  <IconPlus size={10} />
-                  Custom
-                </Button>
-              </div>
-              <p className="text-[10px] text-muted-foreground">
-                CDN libraries available in code blocks. Toggle to
-                enable/disable.
-              </p>
+              {/* Bottom Half: CDN Packages */}
+              <hr className="border-slate-200 shrink-0 mr-4" />
+              
+              <div className="flex-1 min-h-0 flex flex-col pb-2">
+                <div className="shrink-0 mb-2 pr-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant="secondary" className="text-[10px] w-fit">
+                      CDN Packages
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-5 text-[10px] gap-0.5 ml-auto px-1.5"
+                      onClick={() => {
+                        setShowPredefinedCdn(!showPredefinedCdn);
+                        setShowAddCdn(false);
+                      }}
+                    >
+                      <IconSparkles size={10} />
+                      Quick
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-5 text-[10px] gap-0.5 px-1.5"
+                      onClick={() => {
+                        setShowAddCdn(!showAddCdn);
+                        setShowPredefinedCdn(false);
+                      }}
+                    >
+                      <IconPlus size={10} />
+                      Custom
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    CDN libraries available in code blocks. Toggle to
+                    enable/disable.
+                  </p>
+                </div>
 
-              {showPredefinedCdn && (
-                <div className="space-y-1 p-2 rounded-lg border border-dashed border-blue-300 bg-blue-50">
+                <div className="flex-1 overflow-y-auto space-y-2 pr-2 min-h-0">
+                  {showPredefinedCdn && (
+                    <div className="space-y-1 p-2 rounded-lg border border-dashed border-blue-300 bg-blue-50 shrink-0">
                   <p className="text-[10px] font-medium text-blue-700 mb-1">
                     Popular CDN Libraries
                   </p>
@@ -527,7 +565,7 @@ const RendererDialog = ({
               )}
 
               {showAddCdn && (
-                <div className="space-y-1.5 p-2 rounded-lg border border-dashed border-slate-300 bg-slate-50">
+                <div className="space-y-1.5 p-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 shrink-0">
                   <Input
                     type="text"
                     value={cdnName}
@@ -680,6 +718,8 @@ const RendererDialog = ({
                     </div>
                   ),
                 )}
+              </div>
+                </div>
               </div>
             </div>
           </div>

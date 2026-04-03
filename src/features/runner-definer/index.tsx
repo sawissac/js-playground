@@ -71,27 +71,47 @@ const InstructionPanel = () => {
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-80" align="start">
-        <div className="space-y-2 text-xs">
-          <p className="text-blue-900">
-            Compose ordered steps and execute them. Steps run top to bottom.
-          </p>
-          <ul className="list-disc list-inside space-y-0.5 text-blue-800">
-            <li>
-              <IconTriangleFilled size={9} className="inline mr-1" />
-              <strong>Set Variable</strong> — assign a value
-            </li>
-            <li>
-              <IconSquareFilled size={9} className="inline mr-1" />
-              <strong>Call Function</strong> — run a function on a variable
-            </li>
-            <li>
-              <IconCode size={9} className="inline mr-1" />
-              <strong>Code</strong> — run JavaScript with @token access
-            </li>
-          </ul>
-          <p className="text-blue-700">
-            All variables must be typed before running.
-          </p>
+        <div className="space-y-3 text-xs">
+          <div>
+            <p className="text-blue-900 font-semibold mb-1">
+              Building Runner Flows
+            </p>
+            <p className="text-blue-800 line-clamp-3">
+              Compose ordered steps that execute from top to bottom. Use the Runner to test logic, manipulate data, or render visual outputs.
+            </p>
+          </div>
+          
+          <div className="space-y-1.5">
+            <div className="flex items-start gap-1.5">
+              <IconTriangleFilled size={12} className="text-blue-700 mt-0.5 shrink-0" />
+              <div>
+                <strong className="text-blue-900">Set Variable</strong>
+                <p className="text-blue-800 text-[11px] leading-tight mt-0.5">Initialize or overwrite variables with static strings, numbers, booleans, arrays, or JSON arrays.</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-1.5">
+              <IconSquareFilled size={12} className="text-blue-700 mt-0.5 shrink-0" />
+              <div>
+                <strong className="text-blue-900">Call Function</strong>
+                <p className="text-blue-800 text-[11px] leading-tight mt-0.5">Execute your custom JavaScript functions on variables using your defined data types.</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-1.5">
+              <IconCode size={12} className="text-blue-700 mt-0.5 shrink-0" />
+              <div>
+                <strong className="text-blue-900">Code Step</strong>
+                <p className="text-blue-800 text-[11px] leading-tight mt-0.5">Write freeform JS, return computed values, access variables with <code className="bg-blue-100 rounded px-1">@token</code> shortcuts, or manipulate the visual Renderer using <code className="bg-blue-100 rounded px-1">@renderer</code>.</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-blue-100/50 p-2 rounded-md border border-blue-200 mt-2">
+            <p className="text-blue-800 text-[10px] italic">
+              Note: All variables must be typed before running. Click "Run" or open the "Renderer" to execute the flow.
+            </p>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
@@ -531,10 +551,10 @@ const RunnerDefiner = () => {
         </Badge>
       </div>
 
-      <div className="flex gap-1.5 rounded-md border p-1.5">
+      <div className="flex flex-wrap gap-1.5 rounded-md border p-1.5">
         <Button
           variant="outline"
-          className="flex-1 h-7 text-xs gap-1"
+          className="flex-1 h-7 text-xs gap-1 min-w-max"
           disabled={!allTyped}
           onClick={() => dispatch(createSetRunner())}
           title={
@@ -548,7 +568,7 @@ const RunnerDefiner = () => {
         </Button>
         <Button
           variant="outline"
-          className="flex-1 h-7 text-xs gap-1"
+          className="flex-1 h-7 text-xs gap-1 min-w-max"
           disabled={!functions.length}
           onClick={() => dispatch(createCallRunner())}
           title={
@@ -562,7 +582,7 @@ const RunnerDefiner = () => {
         </Button>
         <Button
           variant="outline"
-          className="flex-1 h-7 text-xs gap-1"
+          className="flex-1 h-7 text-xs gap-1 min-w-max"
           disabled={!allTyped}
           onClick={() => dispatch(createCodeRunner())}
           title={
@@ -576,7 +596,7 @@ const RunnerDefiner = () => {
         </Button>
         <Button
           variant="default"
-          className="h-7 text-xs gap-1"
+          className="flex-1 h-7 text-xs gap-1 min-w-max text-white"
           disabled={runDisabled}
           onClick={run}
           title={runDisabled ? "Complete all steps first" : "Execute all steps"}

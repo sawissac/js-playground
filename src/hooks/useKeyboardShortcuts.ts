@@ -11,6 +11,7 @@ export interface KeyboardShortcut {
   description: string;
   handler: () => void;
   enabled?: boolean;
+  preventDefault?: boolean;
 }
 
 interface UseKeyboardShortcutsOptions {
@@ -47,7 +48,7 @@ export function useKeyboardShortcuts({
       });
 
       if (matchedShortcut) {
-        if (preventDefault) {
+        if (matchedShortcut.preventDefault !== false && preventDefault) {
           event.preventDefault();
           event.stopPropagation();
         }

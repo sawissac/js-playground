@@ -2832,57 +2832,64 @@ const InstructionPanel = () => {
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-96" align="start">
-        <div className="space-y-2 text-xs">
-          <p className="text-blue-900">
-            Build step-by-step action chains for each function. Each action runs
-            on the result of the previous step.
-          </p>
-          <div className="space-y-0.5">
-            <p className="font-semibold text-blue-900">Magic actions:</p>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-blue-800">
-              <span>
-                <code className="bg-blue-100 px-1 rounded">math</code> — eval
-                expression
+        <div className="space-y-3 text-xs">
+          <div>
+            <p className="text-blue-900 font-semibold mb-1">
+              Building Function Chains
+            </p>
+            <p className="text-blue-800 line-clamp-3">
+              Build step-by-step action chains for each function. Each action runs on the result of the previous step, allowing you to transform data progressively.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <p className="font-semibold text-blue-900 border-b border-blue-100 pb-1">Magic actions:</p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-blue-800">
+              <span className="flex items-start gap-1.5 overflow-hidden">
+                <code className="bg-blue-100 px-1.5 rounded font-medium mt-0.5 shrink-0">math</code>
+                <span className="text-[11px] leading-tight text-blue-700 w-full break-words">eval expression</span>
               </span>
-              <span>
-                <code className="bg-blue-100 px-1 rounded">temp</code> — save
-                value
+              <span className="flex items-start gap-1.5 overflow-hidden">
+                <code className="bg-blue-100 px-1.5 rounded font-medium mt-0.5 shrink-0">temp</code>
+                <span className="text-[11px] leading-tight text-blue-700 w-full break-words">save value</span>
               </span>
-              <span>
-                <code className="bg-blue-100 px-1 rounded">return</code> —
-                return value
+              <span className="flex items-start gap-1.5 overflow-hidden">
+                <code className="bg-blue-100 px-1.5 rounded font-medium mt-0.5 shrink-0">return</code>
+                <span className="text-[11px] leading-tight text-blue-700 w-full break-words">return value</span>
               </span>
-              <span>
-                <code className="bg-blue-100 px-1 rounded">use</code> — switch
-                context
+              <span className="flex items-start gap-1.5 overflow-hidden">
+                <code className="bg-blue-100 px-1.5 rounded font-medium mt-0.5 shrink-0">use</code>
+                <span className="text-[11px] leading-tight text-blue-700 w-full break-words">switch context</span>
               </span>
-              <span>
-                <code className="bg-rose-100 px-1 rounded text-rose-700">
+              <span className="flex items-start gap-1.5 overflow-hidden">
+                <code className="bg-rose-100 px-1.5 rounded text-rose-700 font-medium mt-0.5 shrink-0">
                   if
-                </code>{" "}
-                — condition check
+                </code>
+                <span className="text-[11px] leading-tight text-rose-600 w-full break-words">condition check</span>
               </span>
-              <span>
-                <code className="bg-violet-100 px-1 rounded text-violet-700">
+              <span className="flex items-start gap-1.5 overflow-hidden">
+                <code className="bg-violet-100 px-1.5 rounded text-violet-700 font-medium mt-0.5 shrink-0">
                   when
-                </code>{" "}
-                — conditional block
+                </code>
+                <span className="text-[11px] leading-tight text-violet-600 w-full break-words">conditional block</span>
               </span>
-              <span>
-                <code className="bg-indigo-100 px-1 rounded text-indigo-700">
+              <span className="flex items-start gap-1.5 overflow-hidden">
+                <code className="bg-indigo-100 px-1.5 rounded text-indigo-700 font-medium mt-0.5 shrink-0">
                   loop
-                </code>{" "}
-                — iteration block
+                </code>
+                <span className="text-[11px] leading-tight text-indigo-600 w-full break-words">iteration block</span>
               </span>
-              <span>
-                <code className="bg-teal-100 px-1 rounded text-teal-700">
+              <span className="flex items-start gap-1.5 overflow-hidden">
+                <code className="bg-teal-100 px-1.5 rounded text-teal-700 font-medium mt-0.5 shrink-0">
                   code
-                </code>{" "}
-                — JavaScript block
+                </code>
+                <span className="text-[11px] leading-tight text-teal-600 w-full break-words">JavaScript block</span>
               </span>
             </div>
           </div>
-          <TokensReference />
+          
+          <div className="pt-2">
+            <TokensReference />
+          </div>
         </div>
       </PopoverContent>
     </Popover>

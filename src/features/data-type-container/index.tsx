@@ -35,16 +35,21 @@ const InstructionPanel = () => {
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-80" align="start">
-        <div className="space-y-2 text-xs">
-          <p className="text-blue-900">
-            Assign a data type to each variable. Variables without a type can't
-            be used in runner steps.
-          </p>
-          <p className="text-blue-700">
-            Tip: use{" "}
-            <code className="bg-blue-100 px-1 rounded">myVar:string</code>{" "}
-            inline when creating variables.
-          </p>
+        <div className="space-y-3 text-xs">
+          <div>
+            <p className="text-blue-900 font-semibold mb-1">
+              Data Type Assignment
+            </p>
+            <p className="text-blue-800 line-clamp-3">
+              Assign strong typing to your variables. Variables without a type cannot be used in Runner flows.
+            </p>
+          </div>
+          
+          <div className="bg-amber-100/50 p-2 rounded-md border border-amber-200 mt-2">
+            <p className="text-amber-800 text-[11px] leading-tight">
+              <strong>Tip:</strong> Save time by defining types inline in the Variables panel using the format <code className="bg-amber-200/50 px-1 rounded font-mono">myVar:string</code>.
+            </p>
+          </div>
         </div>
       </PopoverContent>
     </Popover>

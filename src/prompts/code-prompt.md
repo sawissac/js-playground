@@ -30,7 +30,7 @@ const div = document.createElement("div");
 div.id = "my-output";
 div.style.padding = "16px";
 div.style.fontFamily = "monospace";
-div.textContent = v1;
+div.textContent = "hello";
 container.appendChild(div);
 
 container.addEventListener("click", () => {

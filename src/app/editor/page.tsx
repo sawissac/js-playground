@@ -44,12 +44,14 @@ import {
   IconSparkles,
 } from "@tabler/icons-react";
 import { v4 as uuidv4 } from "uuid";
-import { VariableInspector } from "@/components/VariableInspector";
+import { PackageInspector } from "@/components/PackageInspector";
 import { StatusBar } from "@/components/StatusBar";
 import { AskAiOverlay } from "@/components/AskAiOverlay";
+import { motion, useDragControls } from "framer-motion";
 
 const Page = () => {
   const dispatch = useAppDispatch();
+  const dragControls = useDragControls();
   const packages = useAppSelector((state) => state.editor.packages);
   const leftPanelRef = useRef<ImperativePanelHandle>(null);
   const rightPanelRef = useRef<ImperativePanelHandle>(null);
@@ -71,6 +73,14 @@ const Page = () => {
       rightPanelRef.current?.collapse();
       codeDetailPanelRef.current?.collapse();
     }, 100);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   const toggleLeft = () => {
@@ -116,7 +126,60 @@ const Page = () => {
     },
   ].filter((hint) => !dismissedHints.has(hint.id));
 
+  const switchCodeTab = (tab: string) => {
+    window.dispatchEvent(new CustomEvent("force-open-tab", { detail: tab }));
+  };
+
+  useEffect(() => {
+    const handleForceOpenTab = (e: CustomEvent<string>) => {
+      const tab = e.detail;
+      window.dispatchEvent(new CustomEvent("change-code-tab", { detail: tab }));
+      if (rightPanelRef.current?.isCollapsed()) {
+        rightPanelRef.current.expand();
+      }
+      setTimeout(() => {
+        if (codeDetailPanelRef.current?.isCollapsed()) {
+          codeDetailPanelRef.current.expand();
+        }
+      }, 50);
+    };
+
+    window.addEventListener("force-open-tab", handleForceOpenTab as EventListener);
+    return () => window.removeEventListener("force-open-tab", handleForceOpenTab as EventListener);
+  }, []);
+
   const shortcuts = [
+    {
+      key: "c",
+      ctrl: true,
+      description: "Code preview tab",
+      handler: () => switchCodeTab("code"),
+      preventDefault: false,
+    },
+    {
+      key: "o",
+      ctrl: true,
+      description: "Objects tab",
+      handler: () => switchCodeTab("objects"),
+    },
+    {
+      key: "f",
+      ctrl: true,
+      description: "Flow Chart tab",
+      handler: () => switchCodeTab("flowchart"),
+    },
+    {
+      key: "p",
+      ctrl: true,
+      description: "Export preview tab",
+      handler: () => switchCodeTab("export"),
+    },
+    {
+      key: "l",
+      ctrl: true,
+      description: "Log tab",
+      handler: () => switchCodeTab("log"),
+    },
     {
       key: "k",
       ctrl: true,
@@ -132,8 +195,8 @@ const Page = () => {
     {
       key: "i",
       ctrl: true,
-      description: "Open variable inspector",
-      handler: () => setInspectorOpen(true),
+      description: "Open package inspector",
+      handler: () => setInspectorOpen(!inspectorOpen),
     },
     {
       key: "r",
@@ -395,26 +458,35 @@ const Page = () => {
         shortcuts={shortcuts}
       />
 
-      {/* Variable Inspector Dialog */}
+      {/* Package Inspector Dialog */}
       {inspectorOpen && (
         <div className="fixed inset-0 z-50 pointer-events-none">
-          <div className="fixed right-4 top-20 bottom-4 w-96 pointer-events-auto">
-            <div className="h-full bg-white rounded-lg shadow-2xl border border-slate-200 flex flex-col">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                <h3 className="font-semibold text-sm">Variable Inspector</h3>
+          <motion.div 
+            drag
+            dragControls={dragControls}
+            dragListener={false}
+            dragMomentum={false}
+            className="fixed inset-0 m-auto w-80 lg:w-96 pointer-events-auto h-[min(calc(100vh-6rem),800px)] flex flex-col"
+          >
+            <div className="h-full bg-white/95 backdrop-blur-sm rounded-lg shadow-2xl border border-slate-200 flex flex-col pointer-events-auto">
+              <div 
+                className="flex items-center justify-between px-4 py-3 border-b border-slate-200 cursor-move bg-slate-50/80 rounded-t-lg"
+                onPointerDown={(e) => dragControls.start(e)}
+              >
+                <h3 className="font-semibold text-sm">Package Inspector</h3>
                 <button
                   onClick={() => setInspectorOpen(false)}
-                  className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-700"
+                  className="p-1 rounded hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors"
                   title="Close (Ctrl/Cmd+I)"
                 >
                   ✕
                 </button>
               </div>
               <div className="flex-1 overflow-hidden">
-                <VariableInspector />
+                <PackageInspector />
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 

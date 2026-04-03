@@ -55,6 +55,11 @@ const InstructionPanel = () => {
               create multiple
             </li>
             <li>
+              <code className="bg-blue-100 px-1 rounded">f(1-3)</code>
+              {" → "}
+              <code className="bg-blue-100 px-1 rounded">f1, f2, f3</code>
+            </li>
+            <li>
               <kbd className="bg-blue-100 px-1 rounded">Alt/Cmd/Ctrl+3</kbd>{" "}
               focus · <kbd className="bg-blue-100 px-1 rounded">Enter</kbd>{" "}
               submit
@@ -77,6 +82,47 @@ const FunctionsContainer = () => {
   const [newFunctionName, setNewFunctionName] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
+  const [rangePreview, setRangePreview] = useState<string[] | null>(null);
+
+  const expandRanges = (input: string): string => {
+    return input
+      .split(",")
+      .flatMap((seg) => {
+        const match = seg.trim().match(/^([^(]+)\((\d+)-(\d+)\)(.*)$/);
+        if (!match) return [seg.trim()];
+        const [, prefix, startStr, endStr, suffix] = match;
+        const start = parseInt(startStr, 10);
+        const end = parseInt(endStr, 10);
+        if (start > end) return [seg.trim()];
+        const results: string[] = [];
+        for (let i = start; i <= end; i++) {
+          results.push(`${prefix.trim()}${i}${suffix.trim()}`);
+        }
+        return results;
+      })
+      .join(", ");
+  };
+
+  const handleOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setNewFunctionName(val);
+
+    const hasRange = val
+      .split(",")
+      .some((seg) => /^[^(]+\(\d+-\d+\).*$/.test(seg.trim()));
+    if (hasRange) {
+      const expanded = expandRanges(val);
+      setRangePreview(
+        expanded
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      );
+      return;
+    }
+    setRangePreview(null);
+  };
+
   const inputRef = React.useRef<HTMLInputElement>(null);
   const buttonRef = React.useRef<HTMLButtonElement>(null);
 
@@ -117,35 +163,37 @@ const FunctionsContainer = () => {
       );
       return;
     }
-    if (functionNameLists.includes(newFunctionName.trim())) {
-      dispatch(
-        addLog({ type: "warning", message: "Function name already exists" }),
-      );
-      return;
-    }
     if (isEditing) {
+      if (functionNameLists.includes(newFunctionName.trim()) && newFunctionName.trim() !== oldFunctionName) {
+        dispatch(
+          addLog({ type: "warning", message: "Function name already exists" }),
+        );
+        return;
+      }
       const func = functions.find((f) => f.name === oldFunctionName);
       if (func)
         dispatch(updateFunctionName({ id: func.id, newName: newFunctionName }));
+      handleCancelUpdate();
+      return;
     }
-    const isComma = newFunctionName.includes(",");
-    if (isComma && !isEditing) {
-      newFunctionName.split(",").forEach((vc) => {
-        if (temp.includes(vc.trim())) {
-          dispatch(
-            addLog({
-              type: "warning",
-              message: "Function name already exists",
-            }),
-          );
-          return;
-        }
-        temp.push(vc.trim());
-        dispatch(addFunctionName(vc.trim()));
-      });
-    }
-    if (!isComma && !isEditing)
-      dispatch(addFunctionName(newFunctionName.trim()));
+
+    const expanded = expandRanges(newFunctionName);
+    expanded.split(",").forEach((vc) => {
+      const trimmedVc = vc.trim();
+      if (!trimmedVc) return;
+      if (temp.includes(trimmedVc) || functionNameLists.includes(trimmedVc)) {
+        dispatch(
+          addLog({
+            type: "warning",
+            message: "Function name already exists",
+          }),
+        );
+        return;
+      }
+      temp.push(trimmedVc);
+      dispatch(addFunctionName(trimmedVc));
+    });
+
     handleCancelUpdate();
   };
 
@@ -165,6 +213,7 @@ const FunctionsContainer = () => {
     setNewFunctionName("");
     setOldFunctionName("");
     setIsEditing(false);
+    setRangePreview(null);
   };
 
   return (
@@ -227,9 +276,9 @@ const FunctionsContainer = () => {
         <Input
           ref={inputRef}
           value={newFunctionName}
-          onChange={(e) => setNewFunctionName(e.target.value)}
+          onChange={handleOnChange}
           onKeyDown={handleKeyDown}
-          placeholder="e.g. processText, calculate"
+          placeholder="e.g. processText, calc(1-3)"
           className={cn(
             "h-7 text-xs transition-all duration-200",
             "focus:ring-2 focus:ring-primary/20",
@@ -246,6 +295,29 @@ const FunctionsContainer = () => {
           <IconCircleDashedPlus size={14} />
         </Button>
       </div>
+
+      {rangePreview && rangePreview.length > 0 && (
+        <div
+          className={cn(
+            "rounded-md bg-slate-50 border border-slate-200 p-2 text-xs space-y-1",
+            "animate-in fade-in slide-in-from-top-2 duration-150",
+          )}
+        >
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+            will create
+          </p>
+          <div className="flex gap-1 flex-wrap">
+            {rangePreview.map((name) => (
+              <span
+                key={name}
+                className="font-mono bg-white border border-green-200 rounded px-2 py-0.5 text-[11px] text-green-700"
+              >
+                {name}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {showDetail && (
         <div

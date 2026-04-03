@@ -46,39 +46,57 @@ const InstructionPanel = () => {
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-80" align="start">
-        <div className="space-y-2 text-xs">
-          <p className="text-blue-900">
-            Create named variables. Use{" "}
-            <code className="bg-blue-100 px-1 rounded">name:type</code> inline,
-            comma-separate to create multiple.
-          </p>
-          <ul className="list-disc list-inside space-y-0.5 text-blue-800">
-            <li>
-              <code className="bg-blue-100 px-1 rounded">myVar:string</code>
-            </li>
-            <li>
-              <code className="bg-blue-100 px-1 rounded">
-                a:string, b:array, c
-              </code>
-            </li>
-            <li>
-              <code className="bg-blue-100 px-1 rounded">x(1-3)</code>
-              {" → "}
-              <code className="bg-blue-100 px-1 rounded">x1, x2, x3</code>
-            </li>
-            <li>
-              <code className="bg-blue-100 px-1 rounded">x(1-2):number</code>
-              {" → "}
-              <code className="bg-blue-100 px-1 rounded">
-                x1:number, x2:number
-              </code>
-            </li>
-            <li>
-              <kbd className="bg-blue-100 px-1 rounded">Alt/Cmd/Ctrl+1</kbd>{" "}
-              focus · <kbd className="bg-blue-100 px-1 rounded">Enter</kbd>{" "}
-              submit
-            </li>
-          </ul>
+        <div className="space-y-3 text-xs">
+          <div>
+            <p className="text-blue-900 font-semibold mb-1">
+              Variable Management
+            </p>
+            <p className="text-blue-800 line-clamp-3">
+              Define state variables to track data inside this package.
+            </p>
+          </div>
+          
+          <div className="space-y-1.5">
+            <p className="font-semibold text-blue-900 border-b border-blue-100 pb-1">Features & Shortcuts:</p>
+            <div className="space-y-2 text-blue-800 mt-1.5">
+              <div className="flex items-start gap-2">
+                <span className="shrink-0 mt-0.5 text-blue-500">•</span>
+                <div>
+                  <p className="text-[11px] leading-tight text-blue-900 mb-0.5">Define inline types:</p>
+                  <code className="bg-blue-100 px-1.5 py-0.5 rounded font-mono text-[10px]">myVar:string</code>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="shrink-0 mt-0.5 text-blue-500">•</span>
+                <div>
+                  <p className="text-[11px] leading-tight text-blue-900 mb-0.5">Bulk definition:</p>
+                  <code className="bg-blue-100 px-1.5 py-0.5 rounded font-mono text-[10px]">a:string, b:array, c</code>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="shrink-0 mt-0.5 text-blue-500">•</span>
+                <div>
+                  <p className="text-[11px] leading-tight text-blue-900 mb-0.5">Range creation:</p>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <code className="bg-blue-100 px-1.5 py-0.5 rounded font-mono text-[10px]">x(1-3)</code>
+                    <span className="text-[10px] text-blue-500">→</span>
+                    <code className="bg-blue-100 px-1.5 py-0.5 rounded font-mono text-[10px]">x1, x2, x3</code>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-blue-100/50 p-2 rounded-md border border-blue-200 mt-2 flex items-center justify-between text-blue-800">
+            <span className="text-[11px] flex gap-1 items-center">
+              <kbd className="bg-white border border-blue-200 shadow-sm px-1 rounded text-[9px] font-mono">⌘ 1</kbd>
+              Focus input
+            </span>
+            <span className="text-[11px] flex gap-1 items-center">
+              <kbd className="bg-white border border-blue-200 shadow-sm px-1 rounded text-[9px] font-mono">Enter</kbd>
+              Submit
+            </span>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
@@ -164,51 +182,14 @@ const DataTypeContainer = () => {
       return;
     }
     const expanded = expandRanges(newVariable);
-    const isComma = expanded.includes(",");
-    if (isComma) {
-      expanded.split(",").forEach((vc) => {
-        if (temp.includes(vc.trim())) {
-          dispatch(
-            addLog({
-              type: "warning",
-              message: "Variable name already exists",
-            }),
-          );
-          return;
-        }
-        const hasPrefix = vc.trim().includes(":");
-        if (hasPrefix) {
-          const [vName, dType] = vc.trim().split(":");
-          if (variableNameLists.includes(vName.trim())) {
-            dispatch(
-              addLog({
-                type: "warning",
-                message: "Variable name already exists",
-              }),
-            );
-            return;
-          }
-          if (!dataTypes.includes(dType.trim())) {
-            dispatch(
-              addLog({ type: "warning", message: "Data type does not exist" }),
-            );
-            return;
-          }
-          const p = { id: uuidv4(), name: vName.trim() };
-          temp.push(p.name);
-          dispatch(addVariable(p));
-          dispatch(updateDataType({ id: p.id, type: dType }));
-        } else {
-          temp.push(vc.trim());
-          dispatch(addVariable({ id: uuidv4(), name: vc.trim() }));
-        }
-      });
-    }
-    if (!isComma) {
-      const hasPrefix = expanded.trim().includes(":");
+    expanded.split(",").forEach((vc) => {
+      const trimmedVc = vc.trim();
+      if (!trimmedVc) return;
+      
+      const hasPrefix = trimmedVc.includes(":");
       if (hasPrefix) {
-        const [vName, dType] = expanded.trim().split(":");
-        if (variableNameLists.includes(vName.trim())) {
+        const [vName, dType] = trimmedVc.split(":");
+        if (temp.includes(vName.trim()) || variableNameLists.includes(vName.trim())) {
           dispatch(
             addLog({
               type: "warning",
@@ -224,12 +205,24 @@ const DataTypeContainer = () => {
           return;
         }
         const p = { id: uuidv4(), name: vName.trim() };
+        temp.push(p.name);
         dispatch(addVariable(p));
         dispatch(updateDataType({ id: p.id, type: dType }));
       } else {
-        dispatch(addVariable({ id: uuidv4(), name: expanded.trim() }));
+        if (temp.includes(trimmedVc) || variableNameLists.includes(trimmedVc)) {
+          dispatch(
+            addLog({
+              type: "warning",
+              message: "Variable name already exists",
+            }),
+          );
+          return;
+        }
+        temp.push(trimmedVc);
+        dispatch(addVariable({ id: uuidv4(), name: trimmedVc }));
       }
-    }
+    });
+
     handleCancelUpdate();
   };
 
@@ -304,6 +297,8 @@ const DataTypeContainer = () => {
     setNewVariable("");
     setOldVariable("");
     setIsEditing(false);
+    setRangePreview(null);
+    setTypeSuggestions(null);
   };
 
   return (
