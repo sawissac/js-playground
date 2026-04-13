@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   IconArrowRight,
-  IconCodeDots,
   IconRocket,
   IconBrandReact,
   IconChartBar,
@@ -22,7 +21,8 @@ import {
   IconPalette,
   IconCode,
 } from "@tabler/icons-react";
-import RendererDialog from "@/features/renderer";
+import RendererPanel from "@/features/renderer";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Provider } from "react-redux";
 import { store } from "@/state/store";
 import { DEMO_PACKAGES } from "@/lib/demoPackages";
@@ -54,12 +54,14 @@ export default function Home() {
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="container mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shadow-md">
-              <IconCodeDots size={20} className="text-primary-foreground" />
-            </div>
-            <span className="font-bold text-lg tracking-tight">
-              js-playground
-            </span>
+            <Image
+              src="/obit.svg"
+              alt="Obit Logo"
+              width={32}
+              height={32}
+              className="h-8 w-8"
+            />
+            <span className="font-bold text-lg tracking-tight">Obit</span>
           </div>
 
           <div className="flex items-center gap-4">
@@ -83,7 +85,9 @@ export default function Home() {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
             </span>
             <IconBolt size={14} className="shrink-0" />
-            <span className="truncate">js-playground v0.1.0 — Open Source Visual Logic Editor</span>
+            <span className="truncate">
+              Obit v0.1.0 — Open Source Visual Logic Editor
+            </span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight animate-in fade-in slide-in-from-bottom-6 duration-700 delay-150 [text-wrap:balance]">
@@ -217,9 +221,8 @@ export default function Home() {
               Featured Packages
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Explore interactive visualizations and demos created with
-              js-playground. Click any card to see it in action with responsive
-              rendering.
+              Explore interactive visualizations and demos created with Obit.
+              Click any card to see it in action with responsive rendering.
             </p>
           </div>
 
@@ -292,10 +295,14 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div className="md:col-span-2">
               <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                  <IconCodeDots size={20} className="text-primary-foreground" />
-                </div>
-                <span className="font-bold text-lg">js-playground</span>
+                <Image
+                  src="/obit.svg"
+                  alt="Obit Logo"
+                  width={32}
+                  height={32}
+                  className="h-8 w-8"
+                />
+                <span className="font-bold text-lg">Obit</span>
               </div>
               <p className="text-sm text-muted-foreground max-w-xs">
                 A sophisticated visual programming environment for the modern
@@ -351,7 +358,7 @@ export default function Home() {
           </div>
           <div className="border-t border-border pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              © 2026 js-playground. All rights reserved.
+              © 2026 Obit. All rights reserved.
             </p>
             <div className="flex gap-6 text-sm text-muted-foreground">
               <a href="#" className="hover:text-foreground transition-colors">
@@ -370,7 +377,14 @@ export default function Home() {
 
       {/* Renderer Dialog */}
       <Provider store={store}>
-        <RendererDialog open={rendererOpen} onOpenChange={setRendererOpen} />
+        <Dialog open={rendererOpen} onOpenChange={setRendererOpen}>
+          <DialogContent
+            className="sm:max-w-[calc(100vw-2rem)] sm:max-h-[calc(100vh-2rem)] h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] p-0 overflow-hidden"
+            showCloseButton
+          >
+            <RendererPanel onClose={() => setRendererOpen(false)} />
+          </DialogContent>
+        </Dialog>
       </Provider>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -24,7 +25,10 @@ interface StatusBarProps {
 
 export const StatusBar = ({ shortcuts, className }: StatusBarProps) => {
   const getModKey = () => {
-    if (typeof navigator !== "undefined" && navigator.platform?.includes("Mac")) {
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.platform?.includes("Mac")
+    ) {
       return "⌘";
     }
     return "Ctrl";
@@ -34,7 +38,7 @@ export const StatusBar = ({ shortcuts, className }: StatusBarProps) => {
     <div
       className={cn(
         "flex items-center justify-between px-2 sm:px-4 py-1.5 bg-slate-800 text-slate-200 text-xs border-t border-slate-700 shrink-0",
-        className
+        className,
       )}
     >
       {/* Left side - shortcuts */}
@@ -57,8 +61,15 @@ export const StatusBar = ({ shortcuts, className }: StatusBarProps) => {
       </div>
 
       {/* Right side - info */}
-      <div className="hidden sm:flex items-center gap-4 text-slate-400">
-        <span className="text-[10px] font-mono">JS Playground</span>
+      <div className="hidden sm:flex items-center gap-1.5 text-slate-400">
+        <Image
+          src="/obit.svg"
+          alt="Obit Logo"
+          width={14}
+          height={14}
+          className="h-3.5 w-3.5"
+        />
+        <span className="text-[10px] font-mono">Obit</span>
       </div>
     </div>
   );

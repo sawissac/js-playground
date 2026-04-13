@@ -598,7 +598,7 @@ const RunnerDefiner = () => {
           variant="default"
           className="flex-1 h-7 text-xs gap-1 min-w-max text-white"
           disabled={runDisabled}
-          onClick={run}
+          onClick={() => run({ onlyActivePackage: true })}
           title={runDisabled ? "Complete all steps first" : "Execute all steps"}
         >
           <IconRun size={12} />

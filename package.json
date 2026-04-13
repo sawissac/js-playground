@@ -1,5 +1,5 @@
 {
-  "name": "js-playground",
+  "name": "obit",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -19,6 +19,7 @@
     "@tabler/icons-react": "^3.34.1",
     "@types/d3": "^7.4.3",
     "@uiw/react-md-editor": "^4.1.0",
+    "@xyflow/react": "^12.10.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "codemirror": "^6.0.2",

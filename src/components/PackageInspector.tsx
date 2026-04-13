@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { useAppSelector } from "@/state/hooks";
+import { useAppSelector, useAppDispatch } from "@/state/hooks";
+import { setActivePackage } from "@/state/slices/editorSlice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,9 @@ import {
 } from "@tabler/icons-react";
 
 export const PackageInspector = () => {
+  const dispatch = useAppDispatch();
   const packages = useAppSelector((state) => state.editor.packages);
+  const activePackageId = useAppSelector((state) => state.editor.activePackageId);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [expandedVars, setExpandedVars] = useState<Set<string>>(new Set());
@@ -155,18 +158,38 @@ export const PackageInspector = () => {
           }
 
           return (
-            <div key={pkg.id} className="border rounded-md border-slate-200 overflow-hidden bg-white/50">
+            <div key={pkg.id} className={cn("border rounded-md overflow-hidden bg-white/50", activePackageId === pkg.id ? "border-blue-300 ring-1 ring-blue-100" : "border-slate-200")}>
               {/* Package Header */}
               <div 
-                className="flex items-center p-2 bg-slate-50 hover:bg-slate-100 cursor-pointer text-xs font-semibold"
+                className={cn(
+                  "flex items-center p-2 cursor-pointer text-xs font-semibold transition-colors",
+                  activePackageId === pkg.id ? "bg-blue-50/50 hover:bg-blue-50" : "bg-slate-50 hover:bg-slate-100"
+                )}
                 onClick={() => toggleExpandPackage(pkg.id)}
               >
                 <div className="w-4 h-4 mr-1 flex items-center justify-center text-slate-500">
                   {isPkgExpanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
                 </div>
-                <IconPackage size={14} className="mr-1.5 text-blue-500" />
+                <IconPackage size={14} className={cn("mr-1.5", activePackageId === pkg.id ? "text-blue-600" : "text-blue-500")} />
                 <span className="flex-1 truncate">{pkg.name}</span>
-                <span className="text-[10px] text-slate-400 font-normal ml-2">
+                {activePackageId === pkg.id ? (
+                  <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-blue-100 text-blue-700 border-blue-300 mr-2">
+                    Active
+                  </Badge>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 px-2 text-[10px] mr-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      dispatch(setActivePackage(pkg.id));
+                    }}
+                  >
+                    Select
+                  </Button>
+                )}
+                <span className="text-[10px] text-slate-400 font-normal">
                   {pkg.variables.length} vars, {pkg.functions.length} fns
                 </span>
               </div>
@@ -199,8 +222,13 @@ export const PackageInspector = () => {
                             return (
                               <div
                                 key={variable.id}
+                                draggable
+                                onDragStart={(e) => {
+                                  e.dataTransfer.setData("application/reactflow", JSON.stringify({ type: "variable", id: variable.id, name: variable.name }));
+                                  e.dataTransfer.effectAllowed = "move";
+                                }}
                                 className={cn(
-                                  "p-2 rounded-md border bg-white",
+                                  "p-2 rounded-md border bg-white cursor-move",
                                   "hover:border-slate-300 transition-colors",
                                   getTypeColor(variable.type)
                                 )}
@@ -275,7 +303,12 @@ export const PackageInspector = () => {
                           {filteredFuncs.map((func) => (
                             <div
                               key={func.id}
-                              className="p-1.5 px-2.5 rounded-md border text-xs font-mono bg-white border-slate-200 flex items-center justify-between"
+                              draggable
+                              onDragStart={(e) => {
+                                e.dataTransfer.setData("application/reactflow", JSON.stringify({ type: "function", id: func.id, name: func.name }));
+                                e.dataTransfer.effectAllowed = "move";
+                              }}
+                              className="p-1.5 px-2.5 rounded-md border text-xs font-mono bg-white border-slate-200 flex items-center justify-between cursor-move hover:border-slate-300"
                             >
                               <span className="truncate">{func.name}()</span>
                               {func.dataType && (

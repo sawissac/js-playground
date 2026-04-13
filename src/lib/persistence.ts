@@ -8,7 +8,7 @@ const AUTO_SAVE_INTERVAL = 3000; // 3 seconds
 localforage.config({
   name: "js-playground",
   storeName: "editor_state",
-  description: "JS Playground editor state persistence",
+  description: "Obit editor state persistence",
 });
 
 export const persistenceService = {

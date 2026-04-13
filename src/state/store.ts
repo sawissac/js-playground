@@ -3,6 +3,8 @@
 import { configureStore } from "@reduxjs/toolkit";
 import editorReducer from "./slices/editorSlice";
 import logReducer from "./slices/logSlice";
+import canvasReducer from "./slices/canvasSlice";
+import canvasRunnerReducer from "./slices/canvasRunnerSlice";
 import { persistenceMiddleware } from "./middleware/persistence";
 import { undoRedoMiddleware } from "./middleware/undoRedo";
 
@@ -11,7 +13,8 @@ export const store = configureStore({
   reducer: {
     editor: editorReducer,
     log: logReducer,
-    // Add other reducers here as needed
+    canvas: canvasReducer,
+    canvasRunner: canvasRunnerReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(undoRedoMiddleware, persistenceMiddleware),

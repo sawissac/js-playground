@@ -15,7 +15,8 @@ import FunctionDefiner from "@/features/function-definer";
 import RunnerDefiner from "@/features/runner-definer";
 import CodeDetail from "@/features/code-detail";
 import ProjectSidebar from "@/features/project-sidebar";
-import RendererDialog from "@/features/renderer";
+import RendererPanel from "@/features/renderer";
+import { Canvas } from "@/features/canvas";
 import { cn } from "@/lib/utils";
 import {
   PanelLeftCloseIcon,
@@ -40,18 +41,20 @@ import {
   IconSearch,
   IconBug,
   IconPlayerPlay,
-  IconSearch as IconSearchIcon,
   IconSparkles,
   IconVariable,
   IconFunction,
+  IconDeviceDesktop,
+  IconLayersSubtract,
 } from "@tabler/icons-react";
 import { v4 as uuidv4 } from "uuid";
 import { PackageInspector } from "@/components/PackageInspector";
 import { StatusBar } from "@/components/StatusBar";
 import { AskAiOverlay } from "@/components/AskAiOverlay";
-import { motion, useDragControls } from "framer-motion";
+import { StartupPage } from "@/features/startup-page";
+import { motion, useDragControls, AnimatePresence } from "framer-motion";
 
-type MobileTab = "definitions" | "actions" | "runner";
+type MobileTab = "definitions" | "actions" | "runner" | "renderer";
 
 const Page = () => {
   const dispatch = useAppDispatch();
@@ -59,9 +62,10 @@ const Page = () => {
   const packages = useAppSelector((state) => state.editor.packages);
   const leftPanelRef = useRef<ImperativePanelHandle>(null);
   const rightPanelRef = useRef<ImperativePanelHandle>(null);
+  const [rendererOpen, setRendererOpen] = useState(false);
+  const [showStartup, setShowStartup] = useState(packages.length === 0);
   const [leftCollapsed, setLeftCollapsed] = React.useState(true);
   const [rightCollapsed, setRightCollapsed] = React.useState(true);
-  const [rendererOpen, setRendererOpen] = useState(false);
   const codeDetailPanelRef = useRef<ImperativePanelHandle>(null);
   const [codeDetailCollapsed, setCodeDetailCollapsed] = React.useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -71,6 +75,18 @@ const Page = () => {
   const { dismissedHints, dismissHint } = useTutorialHints();
   const [mobileTab, setMobileTab] = useState<MobileTab>("actions");
   const [isMobile, setIsMobile] = useState(false);
+  const [canvasOpen, setCanvasOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("obit-canvas-open") === "true";
+    }
+    return false;
+  });
+
+  const toggleCanvas = () => setCanvasOpen((v) => !v);
+
+  useEffect(() => {
+    localStorage.setItem("obit-canvas-open", String(canvasOpen));
+  }, [canvasOpen]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -79,14 +95,9 @@ const Page = () => {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  useEffect(() => {
-    // Auto-collapse panels on mount
-    setTimeout(() => {
-      leftPanelRef.current?.collapse();
-      rightPanelRef.current?.collapse();
-      codeDetailPanelRef.current?.collapse();
-    }, 100);
 
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
@@ -116,6 +127,8 @@ const Page = () => {
     }
   };
 
+  const toggleRenderer = () => setRendererOpen((v) => !v);
+
   const toggleCodeDetail = () => {
     const panel = codeDetailPanelRef.current;
     if (!panel) return;
@@ -126,7 +139,7 @@ const Page = () => {
   const tutorialHints: TutorialHint[] = [
     {
       id: "welcome",
-      title: "👋 Welcome to JS Playground!",
+      title: "👋 Welcome to Obit!",
       description:
         "Start by creating variables, functions, and runners to build your interactive JavaScript projects.",
       action: {
@@ -218,8 +231,8 @@ const Page = () => {
     {
       key: "r",
       ctrl: true,
-      description: "Open renderer",
-      handler: () => setRendererOpen(true),
+      description: "Toggle renderer panel",
+      handler: toggleRenderer,
     },
     {
       key: "j",
@@ -264,9 +277,9 @@ const Page = () => {
     },
     {
       icon: <IconPlayerPlay size={12} />,
-      label: "Run",
+      label: "Renderer",
       shortcut: "R",
-      onClick: () => setRendererOpen(true),
+      onClick: toggleRenderer,
     },
     {
       icon: <IconSparkles size={12} />,
@@ -280,14 +293,42 @@ const Page = () => {
     { id: "definitions" as MobileTab, label: "Definitions", icon: IconVariable },
     { id: "actions" as MobileTab, label: "Actions", icon: IconFunction },
     { id: "runner" as MobileTab, label: "Runner", icon: IconPlayerPlay },
+    { id: "renderer" as MobileTab, label: "Renderer", icon: IconDeviceDesktop },
   ];
 
   return (
     <div className="flex flex-col w-full h-[100dvh] overflow-hidden">
       {/* Top Application Bar */}
-      <ProjectSidebar />
+      <ProjectSidebar onOpenStartup={() => setShowStartup(true)} />
 
-      <div className="flex-1 w-full overflow-hidden">
+      <div className="flex-1 w-full overflow-hidden relative">
+        {/* Canvas view — full overlay, above renderer */}
+        <div className={cn(
+          "absolute inset-0 transition-opacity duration-150",
+          canvasOpen ? "opacity-100 z-20 pointer-events-auto" : "opacity-0 z-[-1] pointer-events-none",
+        )}>
+          <FeatureErrorBoundary featureName="Canvas">
+            <Canvas
+              onClose={toggleCanvas}
+              onOpenRenderer={() => { toggleCanvas(); toggleRenderer(); }}
+            />
+          </FeatureErrorBoundary>
+        </div>
+
+        {/* Renderer view — always in layout, opacity-switched to avoid panel remeasure flash */}
+        <div className={cn(
+          "absolute inset-0 transition-opacity duration-150",
+          rendererOpen ? "opacity-100 z-10 pointer-events-auto" : "opacity-0 z-0 pointer-events-none",
+        )}>
+          <FeatureErrorBoundary featureName="Renderer">
+            <RendererPanel onClose={toggleRenderer} />
+          </FeatureErrorBoundary>
+        </div>
+
+        <div className={cn(
+          "absolute inset-0 transition-opacity duration-150",
+          rendererOpen ? "opacity-0 z-0 pointer-events-none" : "opacity-100 z-10 pointer-events-auto",
+        )}>
         {isMobile ? (
           /* ── Mobile Layout: single panel with bottom tab switcher ── */
           <div className="h-full flex flex-col">
@@ -319,13 +360,29 @@ const Page = () => {
                     </Badge>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setRendererOpen(true)}
+                        onClick={toggleCanvas}
                         className={cn(
                           "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
-                          "bg-blue-50 text-blue-600 border border-blue-200",
-                          "hover:bg-blue-100 hover:text-blue-700 transition-colors",
+                          "border transition-colors",
+                          canvasOpen
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : "bg-indigo-50 text-indigo-600 border-indigo-200",
                         )}
-                        title="Open Renderer"
+                        title="Toggle Canvas"
+                      >
+                        <IconLayersSubtract className="size-3" />
+                        Canvas
+                      </button>
+                      <button
+                        onClick={toggleRenderer}
+                        className={cn(
+                          "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
+                          "border transition-colors",
+                          !rendererOpen
+                            ? "bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 hover:text-blue-700"
+                            : "bg-blue-600 text-white border-blue-600 hover:bg-blue-700",
+                        )}
+                        title={!rendererOpen ? "Open Renderer (Ctrl+R)" : "Close Renderer (Ctrl+R)"}
                       >
                         <MonitorPlayIcon className="size-3" />
                         Renderer
@@ -368,6 +425,14 @@ const Page = () => {
                   </FeatureErrorBoundary>
                 </div>
               )}
+
+              {mobileTab === "renderer" && (
+                <div className="h-full overflow-hidden animate-in fade-in duration-300">
+                  <FeatureErrorBoundary featureName="Renderer">
+                    <RendererPanel />
+                  </FeatureErrorBoundary>
+                </div>
+              )}
             </div>
 
             {/* Mobile bottom tab bar */}
@@ -396,7 +461,7 @@ const Page = () => {
               {/* Left Panel — Definitions */}
               <ResizablePanel
                 ref={leftPanelRef}
-                defaultSize={20}
+                defaultSize={0}
                 minSize={16}
                 maxSize={30}
                 collapsible
@@ -456,13 +521,29 @@ const Page = () => {
                         Function Actions
                       </Badge>
                       <button
-                        onClick={() => setRendererOpen(true)}
+                        onClick={toggleCanvas}
                         className={cn(
                           "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
-                          "bg-blue-50 text-blue-600 border border-blue-200",
-                          "hover:bg-blue-100 hover:text-blue-700 transition-colors",
+                          "border transition-colors",
+                          canvasOpen
+                            ? "bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700"
+                            : "bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100 hover:text-indigo-700",
                         )}
-                        title="Open Renderer"
+                        title="Toggle Canvas"
+                      >
+                        <IconLayersSubtract className="size-3" />
+                        Canvas
+                      </button>
+                      <button
+                        onClick={toggleRenderer}
+                        className={cn(
+                          "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
+                          "border transition-colors",
+                          !rendererOpen
+                            ? "bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 hover:text-blue-700"
+                            : "bg-blue-600 text-white border-blue-600 hover:bg-blue-700",
+                        )}
+                        title={!rendererOpen ? "Open Renderer (Ctrl+R)" : "Close Renderer (Ctrl+R)"}
                       >
                         <MonitorPlayIcon className="size-3" />
                         Renderer
@@ -520,7 +601,7 @@ const Page = () => {
               {/* Right Panel — Runner + Code Detail + Log */}
               <ResizablePanel
                 ref={rightPanelRef}
-                defaultSize={30}
+                defaultSize={0}
                 minSize={24}
                 collapsible
                 collapsedSize={0}
@@ -549,7 +630,7 @@ const Page = () => {
                   {/* Code Detail — Objects + FlowChart tabs */}
                   <ResizablePanel
                     ref={codeDetailPanelRef}
-                    defaultSize={32}
+                    defaultSize={5}
                     minSize={18}
                     collapsible
                     collapsedSize={5}
@@ -575,10 +656,11 @@ const Page = () => {
             </ResizablePanelGroup>
           </div>
         )}
+        </div>
       </div>
 
-      <RendererDialog open={rendererOpen} onOpenChange={setRendererOpen} />
       <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+
       <KeyboardShortcutsDialog
         open={shortcutsOpen}
         onOpenChange={setShortcutsOpen}
@@ -617,7 +699,12 @@ const Page = () => {
         </div>
       )}
 
+
       <AskAiOverlay open={askAiOpen} onClose={() => setAskAiOpen(false)} />
+
+      <AnimatePresence>
+        {showStartup && <StartupPage onClose={() => setShowStartup(false)} />}
+      </AnimatePresence>
 
       <TutorialHints
         hints={tutorialHints}

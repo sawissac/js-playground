@@ -330,6 +330,33 @@ export const editorSlice = createSlice({
       });
     },
 
+    // Canvas-specific: add a function with a pre-generated ID
+    addFunctionById: (
+      state,
+      action: PayloadAction<{ id: string; name: string }>
+    ) => {
+      const pkg = getActivePkg(state);
+      pkg.functions.push({
+        id: action.payload.id,
+        name: action.payload.name,
+        dataType: "",
+        actions: [
+          {
+            id: uuidv4(),
+            name: "temp",
+            dataType: "",
+            value: ["@arg1"],
+          },
+          {
+            id: uuidv4(),
+            name: "use",
+            dataType: "",
+            value: ["@temp1"],
+          },
+        ],
+      });
+    },
+
     updateFunctionName: (
       state,
       action: PayloadAction<{
@@ -837,6 +864,7 @@ export const {
   updateVariableValue,
   updateDataType,
   addFunctionName,
+  addFunctionById,
   removeFunctionName,
   updateFunctionName,
   addFunctionAction,

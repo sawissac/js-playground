@@ -9,6 +9,7 @@ export interface AiSettings {
   ollamaModel: string;
   // Gemini
   geminiApiKey: string;
+  geminiApiKeys?: string[];
   geminiModel: string;
 }
 
@@ -17,6 +18,7 @@ const DEFAULT_SETTINGS: AiSettings = {
   ollamaUrl: "",
   ollamaModel: "",
   geminiApiKey: "",
+  geminiApiKeys: [],
   geminiModel: "gemini-2.0-flash",
 };
 

@@ -44,9 +44,11 @@ import { useDialog } from "@/hooks/useDialog";
 
 const LOCAL_STORAGE_KEY = "js_playground_project_save";
 
-interface ProjectSidebarProps {}
+interface ProjectSidebarProps {
+  onOpenStartup?: () => void;
+}
 
-const ProjectSidebar = ({}: ProjectSidebarProps = {}) => {
+const ProjectSidebar = ({ onOpenStartup }: ProjectSidebarProps = {}) => {
   const dispatch = useAppDispatch();
   const editorState = useAppSelector((state) => state.editor);
   const dialog = useDialog();
@@ -538,6 +540,18 @@ const ProjectSidebar = ({}: ProjectSidebarProps = {}) => {
             onChange={handleImportProject}
             className="hidden"
           />
+          <div className="w-px h-4 bg-slate-200/50 mx-1 border-gray-300"></div>
+          {onOpenStartup && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-5 w-5 hover:bg-slate-100 rounded text-slate-400 transition-colors"
+              onClick={onOpenStartup}
+              title="Open Dashboard"
+            >
+              <IconPackage size={12} />
+            </Button>
+          )}
         </div>
       </div>
 

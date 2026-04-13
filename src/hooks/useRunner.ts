@@ -25,10 +25,11 @@ const sanitizeCdnName = (name: string): string => {
 
 export const useRunner = () => {
   const packages = useAppSelector((state) => state.editor.packages);
+  const activePackageId = useAppSelector((state) => state.editor.activePackageId);
   const projectId = useAppSelector((state) => state.editor.projectId);
   const dispatch = useAppDispatch();
 
-  const run = async () => {
+  const run = async (options?: { onlyActivePackage?: boolean }) => {
     const rendererId = `renderer-${projectId}`;
 
     // Check rate limit before execution
@@ -53,21 +54,27 @@ export const useRunner = () => {
       rendererEl.innerHTML = "";
     }
 
-    // Get all enabled packages in order
-    const enabledPackages = packages.filter((pkg) => pkg.enabled !== false);
+    // Get target packages for execution
+    let targetPackages = packages;
+    if (options?.onlyActivePackage) {
+      const activePackage = packages.find((pkg) => pkg.id === activePackageId);
+      targetPackages = activePackage ? [activePackage] : [];
+    } else {
+      targetPackages = packages.filter((pkg) => pkg.enabled !== false);
+    }
 
-    if (enabledPackages.length === 0) {
+    if (targetPackages.length === 0) {
       dispatch(
         addLog({
           type: "warning",
-          message: "No enabled packages to execute",
+          message: "No packages to execute",
           context: "runner",
         }),
       );
       return;
     }
 
-    const totalSteps = enabledPackages.reduce(
+    const totalSteps = targetPackages.reduce(
       (sum, pkg) => sum + pkg.runner.length,
       0,
     );
@@ -75,15 +82,15 @@ export const useRunner = () => {
     dispatch(
       addLog({
         type: "info",
-        message: `Starting execution — ${enabledPackages.length} package${enabledPackages.length !== 1 ? "s" : ""}, ${totalSteps} step${totalSteps !== 1 ? "s" : ""}`,
+        message: `Starting execution — ${targetPackages.length} package${targetPackages.length !== 1 ? "s" : ""}, ${totalSteps} step${totalSteps !== 1 ? "s" : ""}`,
         context: "runner",
       }),
     );
 
     try {
-      // Collect all enabled CDN packages from all enabled packages
+      // Collect all enabled CDN packages from all target packages
       const allCdnPackages = new Map<string, { name: string; url: string }>();
-      for (const pkg of enabledPackages) {
+      for (const pkg of targetPackages) {
         const pkgCdnPackages = pkg.cdnPackages || [];
         for (const cdn of pkgCdnPackages) {
           if (cdn.enabled && !allCdnPackages.has(cdn.name)) {
@@ -170,8 +177,8 @@ export const useRunner = () => {
         }
       }
 
-      // Execute each enabled package in order
-      for (const pkg of enabledPackages) {
+      // Execute each target package in order
+      for (const pkg of targetPackages) {
         dispatch(
           addLog({
             type: "info",

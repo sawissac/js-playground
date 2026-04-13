@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "JS Playground",
+  title: "Obit",
   description: "Visual Logic Editor for the Modern Web",
 };
 

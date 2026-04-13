@@ -2898,17 +2898,24 @@ const InstructionPanel = () => {
 
 // ─── FunctionDefiner ──────────────────────────────────────────────────────────
 
-const FunctionDefiner = () => {
+const FunctionDefiner = ({ filterFunctionId }: { filterFunctionId?: string } = {}) => {
   const dispatch = useAppDispatch();
-  const functions = useAppSelector(
+  const allFunctions = useAppSelector(
     (state) =>
       state.editor.packages.find((p) => p.id === state.editor.activePackageId)!
         .functions,
   );
+  // When filterFunctionId is provided, show only that function
+  const functions = filterFunctionId
+    ? allFunctions.filter((f) => f.id === filterFunctionId)
+    : allFunctions;
+
+  // Auto-expand when a filterFunctionId is given
   const [showDetails, setShowDetails] = React.useState<Record<string, boolean>>(
-    {},
+    filterFunctionId ? { [filterFunctionId]: true } : {},
   );
-  const isShown = (id: string) => showDetails[id] === true;
+  const isShown = (id: string) =>
+    filterFunctionId ? true : showDetails[id] === true;
   const toggleDetail = (id: string) =>
     setShowDetails((prev) => ({ ...prev, [id]: !isShown(id) }));
   const [dragState, setDragState] = React.useState<{
@@ -2954,15 +2961,17 @@ const FunctionDefiner = () => {
   };
 
   return (
-    <div className="space-y-2 pb-[300px]">
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <InstructionPanel />
+    <div className={filterFunctionId ? "space-y-2" : "space-y-2 pb-[300px]"}>
+      {!filterFunctionId && (
+        <div className="flex items-center gap-2">
+          <div className="flex-1">
+            <InstructionPanel />
+          </div>
+          <div className="shrink-0 flex items-center justify-center p-1 border rounded-md bg-white border-slate-200">
+            <HelpModal />
+          </div>
         </div>
-        <div className="shrink-0 flex items-center justify-center p-1 border rounded-md bg-white border-slate-200">
-          <HelpModal />
-        </div>
-      </div>
+      )}
 
       {functions.length === 0 ? (
         <p className="text-xs text-muted-foreground text-center py-4 border border-dashed rounded-md">

@@ -271,6 +271,12 @@ const SettingsPanel = ({
   const [geminiApiKey, setGeminiApiKey] = useState(
     initialSettings.geminiApiKey || "",
   );
+  const [geminiApiKeys, setGeminiApiKeys] = useState<string[]>(
+    initialSettings.geminiApiKeys?.length ? initialSettings.geminiApiKeys : (initialSettings.geminiApiKey ? [initialSettings.geminiApiKey] : [])
+  );
+  const [isAddingNewKey, setIsAddingNewKey] = useState(
+    !initialSettings.geminiApiKeys?.length && !initialSettings.geminiApiKey
+  );
   const [geminiModel, setGeminiModel] = useState(
     initialSettings.geminiModel || "gemini-2.0-flash",
   );
@@ -319,13 +325,23 @@ const SettingsPanel = ({
       setError("Please set both API key and model.");
       return;
     }
+    let updatedKeys = geminiApiKeys;
+    if (provider === "gemini") {
+      if (!updatedKeys.includes(geminiApiKey)) {
+        updatedKeys = [...updatedKeys, geminiApiKey];
+      }
+    }
+
     saveAiSettings({
       provider,
       ollamaUrl,
       ollamaModel,
       geminiApiKey,
+      geminiApiKeys: updatedKeys,
       geminiModel,
     });
+    setGeminiApiKeys(updatedKeys);
+    setIsAddingNewKey(false);
     setSuccess(true);
     setTimeout(() => onConfigured(), 500);
   };
@@ -459,19 +475,72 @@ const SettingsPanel = ({
       {provider === "gemini" && (
         <>
           <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
-              API Key
-            </label>
-            <input
-              type="password"
-              value={geminiApiKey}
-              onChange={(e) => {
-                setGeminiApiKey(e.target.value);
-                setError("");
-              }}
-              placeholder="Enter your Gemini API key"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-300"
-            />
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                API Key
+              </label>
+              {geminiApiKeys.length > 0 && (
+                <button
+                  onClick={() => setIsAddingNewKey(!isAddingNewKey)}
+                  className="text-[10px] text-purple-500 hover:text-purple-600 font-medium"
+                >
+                  {isAddingNewKey ? "Select Saved" : "Add New"}
+                </button>
+              )}
+            </div>
+
+            {!isAddingNewKey && geminiApiKeys.length > 0 ? (
+              <div className="flex gap-2">
+                <select
+                  value={geminiApiKey}
+                  onChange={(e) => {
+                    setGeminiApiKey(e.target.value);
+                    setError("");
+                  }}
+                  className="flex-1 px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-300"
+                >
+                  {geminiApiKeys.map((key) => (
+                    <option key={key} value={key}>
+                      ••••••••{key.slice(-4)}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => {
+                    const filtered = geminiApiKeys.filter(k => k !== geminiApiKey);
+                    setGeminiApiKeys(filtered);
+                    let newKey = filtered[0] || "";
+                    setGeminiApiKey(newKey);
+                    if (filtered.length === 0) {
+                      setIsAddingNewKey(true);
+                    }
+                    saveAiSettings({
+                      provider,
+                      ollamaUrl,
+                      ollamaModel,
+                      geminiApiKey: newKey,
+                      geminiApiKeys: filtered,
+                      geminiModel,
+                    });
+                  }}
+                  title="Remove this key"
+                  className="px-2 py-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 border border-transparent transition-colors"
+                >
+                  <IconTrash size={16} />
+                </button>
+              </div>
+            ) : (
+              <input
+                type="password"
+                value={geminiApiKey}
+                onChange={(e) => {
+                  setGeminiApiKey(e.target.value);
+                  setError("");
+                }}
+                placeholder="Enter your Gemini API key"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-300"
+              />
+            )}
             <p className="text-[10px] text-slate-400">
               Get your API key from{" "}
               <a

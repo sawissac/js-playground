@@ -375,4 +375,31 @@ return 'Animation started!';`,
     codeSnippets: [],
     cdnPackages: [],
   },
+
+  "hello-world": {
+    id: uuidv4(),
+    name: "Hello World",
+    enabled: true,
+    isDemo: true,
+    variables: [
+      {
+        id: uuidv4(),
+        name: "greeting",
+        type: "string",
+        value: "Hello, World!",
+      },
+    ],
+    functions: [],
+    runner: [
+      {
+        id: uuidv4(),
+        type: "code",
+        target: ["", ""],
+        args: [],
+        code: `// Hello World Demo\nconst container = document.getElementById(@renderer);\ncontainer.innerHTML = \`<div style="display: flex; align-items: center; justify-content: center; height: 100%; font-family: sans-serif; font-size: 2rem; color: #3b82f6; font-weight: bold;">\${@greeting}</div>\`;\nreturn 'Hello World rendered!';`,
+      },
+    ],
+    codeSnippets: [],
+    cdnPackages: [],
+  },
 };
