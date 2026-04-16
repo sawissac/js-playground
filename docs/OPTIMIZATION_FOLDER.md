@@ -1,4 +1,3 @@
-
 **Feature Folder Structure Optimization Prompt**
 
 You are organizing a frontend project using a feature-based folder structure. Follow these rules strictly when generating or refactoring code:
@@ -31,3 +30,22 @@ You are organizing a frontend project using a feature-based folder structure. Fo
 * ✅ Reusable hooks → `src/hooks/`
 * ❌ Never import from another feature's `components/` folder
 * ❌ No unnamed or unscoped constants
+
+---
+
+**Optimization Progress:**
+
+- [x] `canvas`
+- [x] `code-detail`
+- [x] `code-sidebar`
+- [x] `data-type-container`
+- [x] `function-definer`
+- [x] `functions-container`
+- [x] `help-modal`
+- [x] `import-export`
+- [x] `log-container`
+- [x] `project-sidebar`
+- [x] `renderer`
+- [x] `runner-definer`
+- [x] `startup-page`
+- [x] `variable-container`

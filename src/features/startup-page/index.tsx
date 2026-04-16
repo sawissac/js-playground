@@ -5,80 +5,24 @@ import { motion } from "framer-motion";
 import {
   IconPlus,
   IconPackage,
-  IconChartBar,
-  IconBrandD3,
   IconSparkles,
-  IconCodeDots,
   IconX,
 } from "@tabler/icons-react";
-import { useAppDispatch, useAppSelector } from "@/state/hooks";
-import {
-  loadDemoPackage,
-  addPackage,
-  setActivePackage,
-} from "@/state/slices/editorSlice";
-import { DEMO_PACKAGES } from "@/lib/demoPackages";
-import { v4 as uuidv4 } from "uuid";
 import { cn } from "@/lib/utils";
+import { STARTUP_PAGE_DEMO_PRESETS } from "./constants";
+import { useStartupPageManager } from "./hooks/useStartupPageManager";
 
 interface StartupPageProps {
   onClose: () => void;
 }
 
-const DEMO_PRESETS = [
-  {
-    title: "D3 Bar Chart",
-    desc: "Interactive bar chart with animations",
-    icon: IconChartBar,
-    color: "from-blue-500 to-cyan-500",
-    demoKey: "d3-bar-chart",
-  },
-  {
-    title: "Data Visualization",
-    desc: "Dynamic network graph with D3.js",
-    icon: IconBrandD3,
-    color: "from-orange-500 to-red-500",
-    demoKey: "data-visualization",
-  },
-  {
-    title: "Creative Canvas",
-    desc: "Generative art with canvas",
-    icon: IconSparkles,
-    color: "from-purple-500 to-pink-500",
-    demoKey: "creative-canvas",
-  },
-  {
-    title: "Hello World",
-    desc: "Simple starter template",
-    icon: IconCodeDots,
-    color: "from-green-500 to-emerald-500",
-    demoKey: "hello-world",
-  },
-];
-
 export const StartupPage: React.FC<StartupPageProps> = ({ onClose }) => {
-  const dispatch = useAppDispatch();
-  const packages = useAppSelector((state) => state.editor.packages);
-
-  const handleDemoClick = (demoKey: string) => {
-    const demoPackage = DEMO_PACKAGES[demoKey];
-    if (demoPackage) {
-      const newPkg = JSON.parse(JSON.stringify(demoPackage));
-      newPkg.id = uuidv4();
-      dispatch(loadDemoPackage(newPkg));
-      onClose();
-    }
-  };
-
-  const handleCreatePackage = () => {
-    dispatch(addPackage({ name: `Package ${packages.length + 1}` }));
-    onClose();
-  };
-
-  const handleSelectPackage = (pkgId: string) => {
-    dispatch(setActivePackage(pkgId));
-    onClose();
-  };
+  const {
+    packages,
+    handleDemoClick,
+    handleCreatePackage,
+    handleSelectPackage,
+  } = useStartupPageManager(onClose);
 
   return (
     <motion.div
@@ -162,7 +106,7 @@ export const StartupPage: React.FC<StartupPageProps> = ({ onClose }) => {
             Starter Templates
           </p>
           <div className="grid grid-cols-2 gap-2">
-            {DEMO_PRESETS.map((preset) => (
+            {STARTUP_PAGE_DEMO_PRESETS.map((preset) => (
               <button
                 key={preset.demoKey}
                 onClick={() => handleDemoClick(preset.demoKey)}
